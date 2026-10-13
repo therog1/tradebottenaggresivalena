@@ -1,0 +1,35 @@
+{
+  "SUI-USDC": {
+    "entry_price": 1.0403,
+    "high_price": 1.0405,
+    "allocated_usdc": 17.5,
+    "qty": 16.82207055657022,
+    "time": 1791897260.095981,
+    "order_res": {
+      "msg": "This API Key does not have trading permission for the market",
+      "code": "50124"
+    }
+  },
+  "LINK-USDC": {
+    "entry_price": 12.922,
+    "high_price": 12.922,
+    "allocated_usdc": 17.5,
+    "qty": 1.3542795232936078,
+    "time": 1791897263.8853278,
+    "order_res": {
+      "msg": "This API Key does not have trading permission for the market",
+      "code": "50124"
+    }
+  },
+  "AVAX-USDC": {
+    "entry_price": 10.209,
+    "high_price": 10.209,
+    "allocated_usdc": 17.5,
+    "qty": 1.7141737682437066,
+    "time": 1791897280.6224036,
+    "order_res": {
+      "msg": "This API Key does not have trading permission for the market",
+      "code": "50124"
+    }
+  }
+}
