@@ -1,7 +1,7 @@
 {
   "PEPE-USDC": {
-    "entry_price": 4.172e-06,
-    "high_price": 4.172e-06,
+    "entry_price": 0.000004172,
+    "high_price": 0.000004172,
     "allocated_usdc": 17.5,
     "qty": 4194630.872483222,
     "time": 1791898137.4529998,
