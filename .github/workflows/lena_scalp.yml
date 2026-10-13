@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   scalp:
-    name: Execute Ken Griffin Momentum Scalp Cycle
+    name: Execute Ken Griffin 3x-5x Futures Scalp Cycle
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -36,13 +36,16 @@ jobs:
           OKX_API_PASSPHRASE: ${{ secrets.OKX_AGGR_PASS || secrets.OKX_API_PASSPHRASE }}
           OKX_IS_DEMO: "false"
           OKX_BASE_URL: "https://eea.okx.com"
-          SYMBOLS: "BTC-USDC,ETH-USDC,SOL-USDC,SUI-USDC,DOGE-USDC,XRP-USDC,PEPE-USDC,AVAX-USDC,NEAR-USDC,APT-USDC,LINK-USDC,ADA-USDC,RENDER-USDC,SHIB-USDC,WIF-USDC,ARB-USDC,OP-USDC,TAO-USDC,ONDO-USDC,FET-USDC,INJ-USDC,TIA-USDC,SEI-USDC,DOT-USDC,POL-USDC,BNB-USDC,LTC-USDC,BCH-USDC,ATOM-USDC,UNI-USDC"
-          IMBALANCE_THRESHOLD: "0.50"
+          SYMBOLS: "BTC-USD_UM_XPERP-310404,ETH-USD_UM_XPERP-310404,SOL-USD_UM_XPERP-310404,SUI-USD_UM_XPERP-310404,DOGE-USD_UM_XPERP-310404,XRP-USD_UM_XPERP-310404,PEPE-USD_UM_XPERP-310404,AVAX-USD_UM_XPERP-310530,NEAR-USD_UM_XPERP-310613,LINK-USD_UM_XPERP-310523"
+          IMBALANCE_THRESHOLD: "0.45"
+          MIN_LEVERAGE: "3"
+          MAX_LEVERAGE: "5"
+          DEFAULT_LEVERAGE: "3"
           RISK_PER_TRADE_PERCENT: "0.35"
           STOP_LOSS_PERCENT: "0.018"
           TAKE_PROFIT_PERCENT: "0.040"
           TRAILING_STOP_PERCENT: "0.009"
-          KILL_SWITCH_MIN_EQUITY: "30.0"
+          KILL_SWITCH_MIN_EQUITY: "25.0"
         run: |
           python bot.py --cycles 6 --sync-history
 
@@ -54,6 +57,6 @@ jobs:
           if git diff --staged --quiet; then
             echo "No trade state changes to commit."
           else
-            git commit -m "Auto-persist Lena active positions and trade history"
+            git commit -m "Auto-persist Lena active futures positions and trade history"
             git push origin main
           fi
