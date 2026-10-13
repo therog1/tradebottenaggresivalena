@@ -1,7 +1,7 @@
 {
   "SUI-USDC": {
     "entry_price": 1.0403,
-    "high_price": 1.0405,
+    "high_price": 1.047,
     "allocated_usdc": 17.5,
     "qty": 16.82207055657022,
     "time": 1791897260.095981,
@@ -12,7 +12,7 @@
   },
   "LINK-USDC": {
     "entry_price": 12.922,
-    "high_price": 12.922,
+    "high_price": 12.955,
     "allocated_usdc": 17.5,
     "qty": 1.3542795232936078,
     "time": 1791897263.8853278,
@@ -23,13 +23,61 @@
   },
   "AVAX-USDC": {
     "entry_price": 10.209,
-    "high_price": 10.209,
+    "high_price": 10.282,
     "allocated_usdc": 17.5,
     "qty": 1.7141737682437066,
     "time": 1791897280.6224036,
     "order_res": {
       "msg": "This API Key does not have trading permission for the market",
       "code": "50124"
+    }
+  },
+  "PEPE-USDC": {
+    "entry_price": 4.172e-06,
+    "high_price": 4.172e-06,
+    "allocated_usdc": 17.5,
+    "qty": 4194630.872483222,
+    "time": 1791898137.4529998,
+    "order_res": {
+      "code": "0",
+      "data": [
+        {
+          "clOrdId": "",
+          "ordId": "4006256149492977664",
+          "sCode": "0",
+          "sMsg": "Order placed",
+          "subCode": "",
+          "tag": "",
+          "ts": "1791898137334"
+        }
+      ],
+      "inTime": "1791898137265428",
+      "msg": "",
+      "outTime": "1791898137404079"
+    }
+  },
+  "INJ-USDC": {
+    "entry_price": 7.77,
+    "high_price": 7.77,
+    "allocated_usdc": 17.5,
+    "qty": 2.2522522522522523,
+    "time": 1791898142.2500498,
+    "order_res": {
+      "code": "0",
+      "data": [
+        {
+          "clOrdId": "",
+          "ordId": "4006256310453587968",
+          "sCode": "0",
+          "sMsg": "Order placed",
+          "subCode": "",
+          "tag": "",
+          "ts": "1791898142131"
+        }
+      ],
+      "inTime": "1791898142062247",
+      "msg": "",
+      "outTime": "1791898142200652"
     }
   }
 }
