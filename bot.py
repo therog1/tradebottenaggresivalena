@@ -30,7 +30,7 @@ class LenaAggressiveBot:
         self.passphrase = os.getenv("OKX_API_PASSPHRASE", "")
         self.is_demo = os.getenv("OKX_IS_DEMO", "false").lower() == "true"
         self.base_url = os.getenv("OKX_BASE_URL", "https://eea.okx.com")
-        self.symbols = [s.strip() for s in os.getenv("SYMBOLS", "SOL-USDC,SUI-USDC,BTC-USDC,ETH-USDC").split(",") if s.strip()]
+        self.symbols = [s.strip() for s in os.getenv("SYMBOLS", "BTC-USDC,ETH-USDC,SOL-USDC,NEAR-USDC,SUI-USDC,DOGE-USDC,XRP-USDC,AVAX-USDC,LINK-USDC,ADA-USDC,RENDER-USDC,ARB-USDC,TAO-USDC,ONDO-USDC,ENA-USDC,PUMP-USDC,FET-USDC,UNI-USDC,STRK-USDC,AAVE-USDC,PEPE-USDC,APT-USDC,SHIB-USDC,DOT-USDC,TIA-USDC,FIL-USDC,WIF-USDC,WLD-USDC,CRV-USDC,ICP-USDC").split(",") if s.strip()]
         self.stop_loss_pct = float(os.getenv("STOP_LOSS_PERCENT", "0.018"))
         self.take_profit_pct = float(os.getenv("TAKE_PROFIT_PERCENT", "0.040"))
         self.trailing_stop_pct = float(os.getenv("TRAILING_STOP_PERCENT", "0.009"))
