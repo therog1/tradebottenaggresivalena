@@ -37,6 +37,7 @@ class LenaAggressiveBot:
         self.imbalance_threshold = float(os.getenv("IMBALANCE_THRESHOLD", "0.50"))
         self.risk_per_trade_pct = float(os.getenv("RISK_PER_TRADE_PERCENT", "0.35"))
         self.kill_switch_min_equity = float(os.getenv("KILL_SWITCH_MIN_EQUITY", "35.0"))
+        self.max_open_positions = int(os.getenv("MAX_OPEN_POSITIONS", "3"))
         self.poll_interval = float(os.getenv("POLL_INTERVAL_SECONDS", "3.0"))
 
         self.client = OKXClient(
@@ -123,6 +124,9 @@ class LenaAggressiveBot:
 
                 # Signal generation: High positive imbalance indicates aggressive buyer absorption
                 if obi >= self.imbalance_threshold and symbol not in self.active_positions:
+                    if len(self.active_positions) >= self.max_open_positions:
+                        logging.info(f"Max active positions reached ({len(self.active_positions)}/{self.max_open_positions}). Skipping buy on {symbol}.")
+                        continue
                     trade_size_usdc = min(equity * self.risk_per_trade_pct, equity * 0.95)
                     if trade_size_usdc >= 10.0:  # Minimum viable order
                         qty = trade_size_usdc / last_price
