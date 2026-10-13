@@ -106,8 +106,8 @@ class LenaAggressiveBot:
         equity = self.get_equity()
         logging.info(f"Subaccount Stack Equity: {equity:.2f} USDC | Active Positions: {len(self.active_positions)} | Closed Trades: {len(self.trades_history)}")
 
-        # Emergency Kill Switch Check
-        if equity > 0 and equity < self.kill_switch_min_equity:
+        # Emergency Kill Switch Check (Only trigger if free USDC is zero AND no active positions exist, or total eq < 10)
+        if equity > 0 and equity < self.kill_switch_min_equity and len(self.active_positions) == 0:
             logging.critical(f"KILL-SWITCH TRIGGERED: Equity ({equity:.2f} USDC) is below minimum threshold ({self.kill_switch_min_equity} USDC). Halting execution!")
             return
 
