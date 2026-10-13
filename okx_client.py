@@ -1,6 +1,5 @@
-"""
-OKX REST Client for Aggressive Execution (Subaccount: Lena)
-Enhanced with Order History & Fills retrieval
+"""OKX REST Client for Aggressive Execution (Subaccount: Lena)
+Enhanced with Futures, Perpetual Swaps, Leverage & Order History
 """
 import os
 import time
@@ -19,7 +18,7 @@ class OKXClient:
         self.base_url = base_url.rstrip("/")
 
     def _get_timestamp(self) -> str:
-        return time.strftime('%Y-%m-%dT%H:%M:%S.000Z', time.gmtime())
+        return time.strftime("%Y-%m-%dT%H:%M:%S.000Z", time.gmtime())
 
     def _sign(self, timestamp: str, method: str, request_path: str, body: str = "") -> str:
         message = timestamp + method.upper() + request_path + body
@@ -33,6 +32,7 @@ class OKXClient:
             import urllib.parse
             query_str = "?" + urllib.parse.urlencode(params)
             url += query_str
+
         body_str = ""
         if data:
             import json
@@ -40,13 +40,14 @@ class OKXClient:
 
         timestamp = self._get_timestamp()
         sign = self._sign(timestamp, method, path + query_str, body_str)
+
         headers = {
             "OK-ACCESS-KEY": self.api_key,
             "OK-ACCESS-SIGN": sign,
             "OK-ACCESS-TIMESTAMP": timestamp,
             "OK-ACCESS-PASSPHRASE": self.passphrase,
             "Content-Type": "application/json",
-            "User-Agent": "TradebottenLena/1.1"
+            "User-Agent": "TradebottenLena/2.0"
         }
         if self.is_demo:
             headers["x-simulated-trading"] = "1"
@@ -69,7 +70,16 @@ class OKXClient:
     def get_orderbook(self, inst_id: str, sz: int = 20) -> Dict[str, Any]:
         return self._request("GET", f"/api/v5/market/books?instId={inst_id}&sz={sz}")
 
-    def place_order(self, inst_id: str, td_mode: str, side: str, ord_type: str, sz: str, px: Optional[str] = None, tgt_ccy: Optional[str] = None) -> Dict[str, Any]:
+    def set_leverage(self, lever: str, mgn_mode: str = "cross", inst_id: Optional[str] = None) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {
+            "lever": str(lever),
+            "mgnMode": mgn_mode
+        }
+        if inst_id:
+            payload["instId"] = inst_id
+        return self._request("POST", "/api/v5/account/set-leverage", data=payload)
+
+    def place_order(self, inst_id: str, td_mode: str, side: str, ord_type: str, sz: str, pos_side: str = "net", px: Optional[str] = None, tgt_ccy: Optional[str] = None) -> Dict[str, Any]:
         payload: Dict[str, Any] = {
             "instId": inst_id,
             "tdMode": td_mode,
@@ -77,11 +87,16 @@ class OKXClient:
             "ordType": ord_type,
             "sz": sz
         }
+        if pos_side:
+            payload["posSide"] = pos_side
         if tgt_ccy:
             payload["tgtCcy"] = tgt_ccy
         if px and ord_type in ("limit", "post_only"):
             payload["px"] = px
         return self._request("POST", "/api/v5/trade/order", data=payload)
+
+    def get_positions(self, inst_type: str = "FUTURES") -> Dict[str, Any]:
+        return self._request("GET", f"/api/v5/account/positions?instType={inst_type}")
 
     def get_open_orders(self, inst_id: Optional[str] = None) -> Dict[str, Any]:
         path = "/api/v5/trade/orders-pending"
@@ -89,13 +104,13 @@ class OKXClient:
             path += f"?instId={inst_id}"
         return self._request("GET", path)
 
-    def get_order_history(self, inst_type: str = "SPOT", inst_id: Optional[str] = None, state: str = "filled", limit: int = 50) -> Dict[str, Any]:
+    def get_order_history(self, inst_type: str = "FUTURES", inst_id: Optional[str] = None, state: str = "filled", limit: int = 50) -> Dict[str, Any]:
         params = {"instType": inst_type, "state": state, "limit": str(limit)}
         if inst_id:
             params["instId"] = inst_id
         return self._request("GET", "/api/v5/trade/orders-history", params=params)
 
-    def get_fills(self, inst_type: str = "SPOT", inst_id: Optional[str] = None, limit: int = 50) -> Dict[str, Any]:
+    def get_fills(self, inst_type: str = "FUTURES", inst_id: Optional[str] = None, limit: int = 50) -> Dict[str, Any]:
         params = {"instType": inst_type, "limit": str(limit)}
         if inst_id:
             params["instId"] = inst_id
