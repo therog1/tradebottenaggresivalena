@@ -3,7 +3,7 @@ name: Lena Aggressive Scalper
 on:
   workflow_dispatch:
   schedule:
-    - cron: '*/15 * * * *'
+    - cron: "*/15 * * * *"
 
 permissions:
   contents: write
@@ -21,8 +21,8 @@ jobs:
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-          cache: 'pip'
+          python-version: "3.11"
+          cache: "pip"
 
       - name: Install dependencies
         run: |
@@ -34,9 +34,10 @@ jobs:
           OKX_API_KEY: ${{ secrets.OKX_API_KEY }}
           OKX_API_SECRET: ${{ secrets.OKX_API_SECRET }}
           OKX_API_PASSPHRASE: ${{ secrets.OKX_API_PASSPHRASE }}
-          OKX_IS_DEMO: ${{ secrets.OKX_IS_DEMO }}
-          OKX_BASE_URL: ${{ secrets.OKX_BASE_URL }}
-          SYMBOLS: "SOL-USDC,SUI-USDC,BTC-USDC,ETH-USDC,DOGE-USDC,XRP-USDC,PEPE-USDC,AVAX-USDC"
+          OKX_IS_DEMO: ${{ secrets.OKX_IS_DEMO || "false" }}
+          OKX_BASE_URL: ${{ secrets.OKX_BASE_URL || "https://eea.okx.com" }}
+          SYMBOLS: "SOL-USDC,SUI-USDC,BTC-USDC,ETH-USDC,DOGE-USDC,XRP-USDC,PEPE-USDC,AVAX-USDC,NEAR-USDC,APT-USDC,LINK-USDC,ADA-USDC,RENDER-USDC,SHIB-USDC"
+          IMBALANCE_THRESHOLD: 0.50
           RISK_PER_TRADE_PERCENT: 0.35
           STOP_LOSS_PERCENT: 0.018
           TAKE_PROFIT_PERCENT: 0.040
