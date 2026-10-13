@@ -26,23 +26,23 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install --upgrade pip
+          python -m pip install --upgrade pip
           pip install -r requirements.txt
 
       - name: Run Lena Aggressive Scalper
         env:
-          OKX_API_KEY: ${{ secrets.OKX_API_KEY }}
-          OKX_API_SECRET: ${{ secrets.OKX_API_SECRET }}
-          OKX_API_PASSPHRASE: ${{ secrets.OKX_API_PASSPHRASE }}
-          OKX_IS_DEMO: ${{ secrets.OKX_IS_DEMO || "false" }}
-          OKX_BASE_URL: ${{ secrets.OKX_BASE_URL || "https://eea.okx.com" }}
+          OKX_API_KEY: ${{ secrets.OKX_AGGR_KEY || secrets.OKX_API_KEY }}
+          OKX_API_SECRET: ${{ secrets.OKX_AGGR_SECRET || secrets.OKX_API_SECRET }}
+          OKX_API_PASSPHRASE: ${{ secrets.OKX_AGGR_PASS || secrets.OKX_API_PASSPHRASE }}
+          OKX_IS_DEMO: "false"
+          OKX_BASE_URL: "https://eea.okx.com"
           SYMBOLS: "SOL-USDC,SUI-USDC,BTC-USDC,ETH-USDC,DOGE-USDC,XRP-USDC,PEPE-USDC,AVAX-USDC,NEAR-USDC,APT-USDC,LINK-USDC,ADA-USDC,RENDER-USDC,SHIB-USDC"
-          IMBALANCE_THRESHOLD: 0.50
-          RISK_PER_TRADE_PERCENT: 0.35
-          STOP_LOSS_PERCENT: 0.018
-          TAKE_PROFIT_PERCENT: 0.040
-          TRAILING_STOP_PERCENT: 0.009
-          KILL_SWITCH_MIN_EQUITY: 30.0
+          IMBALANCE_THRESHOLD: "0.50"
+          RISK_PER_TRADE_PERCENT: "0.35"
+          STOP_LOSS_PERCENT: "0.018"
+          TAKE_PROFIT_PERCENT: "0.040"
+          TRAILING_STOP_PERCENT: "0.009"
+          KILL_SWITCH_MIN_EQUITY: "30.0"
         run: |
           python bot.py --cycles 6 --sync-history
 
