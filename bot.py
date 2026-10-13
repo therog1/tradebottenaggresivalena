@@ -1,6 +1,6 @@
-"""
-Aggressive Momentum & Orderbook Flow Scalper (Lena)
-Ken Griffin Inspired Execution Engine with Complete Position & Order History Persistence
+"""Aggressive Momentum & Orderbook Flow Scalper (Lena)
+Ken Griffin Inspired Execution Engine with 3x-5x Futures (USD-Margined X-Perpetuals)
+Supports OKX EEA USDC Collateral Multi-Currency Margin
 """
 
 import os
@@ -16,12 +16,28 @@ load_dotenv()
 
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] [LENA-AGGRESSIVE] %(message)s",
+    format="%(asctime)s [%(levelname)s] [LENA-FUTURES-3X-5X] %(message)s",
     handlers=[logging.StreamHandler(sys.stdout)]
 )
 
 POSITIONS_FILE = os.path.join(os.path.dirname(__file__), "active_positions.json")
 HISTORY_FILE = os.path.join(os.path.dirname(__file__), "trades_history.json")
+
+# Contract multiplier table for OKX UM X-Perp contracts
+CONTRACT_SPECS = {
+    "BTC-USD_UM_XPERP-310404": {"ctVal": 0.0001, "coin": "BTC", "minSz": 1},
+    "ETH-USD_UM_XPERP-310404": {"ctVal": 0.001, "coin": "ETH", "minSz": 1},
+    "SOL-USD_UM_XPERP-310404": {"ctVal": 0.01, "coin": "SOL", "minSz": 1},
+    "SUI-USD_UM_XPERP-310404": {"ctVal": 1.0, "coin": "SUI", "minSz": 1},
+    "DOGE-USD_UM_XPERP-310404": {"ctVal": 10.0, "coin": "DOGE", "minSz": 1},
+    "XRP-USD_UM_XPERP-310404": {"ctVal": 1.0, "coin": "XRP", "minSz": 1},
+    "PEPE-USD_UM_XPERP-310404": {"ctVal": 1000000.0, "coin": "PEPE", "minSz": 1},
+    "AVAX-USD_UM_XPERP-310530": {"ctVal": 10.0, "coin": "AVAX", "minSz": 1},
+    "NEAR-USD_UM_XPERP-310613": {"ctVal": 1.0, "coin": "NEAR", "minSz": 1},
+    "LINK-USD_UM_XPERP-310523": {"ctVal": 1.0, "coin": "LINK", "minSz": 1},
+}
+
+DEFAULT_FUTURES_SYMBOLS = ",".join(CONTRACT_SPECS.keys())
 
 class LenaAggressiveBot:
     def __init__(self):
@@ -30,14 +46,18 @@ class LenaAggressiveBot:
         self.passphrase = os.getenv("OKX_API_PASSPHRASE", "")
         self.is_demo = os.getenv("OKX_IS_DEMO", "false").lower() == "true"
         self.base_url = os.getenv("OKX_BASE_URL", "https://eea.okx.com")
-        self.symbols = [s.strip() for s in os.getenv("SYMBOLS", "BTC-USDC,ETH-USDC,SOL-USDC,NEAR-USDC,SUI-USDC,DOGE-USDC,XRP-USDC,AVAX-USDC,LINK-USDC,ADA-USDC,RENDER-USDC,ARB-USDC,TAO-USDC,ONDO-USDC,ENA-USDC,PUMP-USDC,FET-USDC,UNI-USDC,STRK-USDC,AAVE-USDC,PEPE-USDC,APT-USDC,SHIB-USDC,DOT-USDC,TIA-USDC,FIL-USDC,WIF-USDC,WLD-USDC,CRV-USDC,ICP-USDC").split(",") if s.strip()]
+
+        self.symbols = [s.strip() for s in os.getenv("SYMBOLS", DEFAULT_FUTURES_SYMBOLS).split(",") if s.strip()]
         self.stop_loss_pct = float(os.getenv("STOP_LOSS_PERCENT", "0.018"))
         self.take_profit_pct = float(os.getenv("TAKE_PROFIT_PERCENT", "0.040"))
         self.trailing_stop_pct = float(os.getenv("TRAILING_STOP_PERCENT", "0.009"))
-        self.imbalance_threshold = float(os.getenv("IMBALANCE_THRESHOLD", "0.50"))
+        self.imbalance_threshold = float(os.getenv("IMBALANCE_THRESHOLD", "0.45"))
         self.risk_per_trade_pct = float(os.getenv("RISK_PER_TRADE_PERCENT", "0.35"))
-        self.kill_switch_min_equity = float(os.getenv("KILL_SWITCH_MIN_EQUITY", "35.0"))
+        self.kill_switch_min_equity = float(os.getenv("KILL_SWITCH_MIN_EQUITY", "25.0"))
         self.max_open_positions = int(os.getenv("MAX_OPEN_POSITIONS", "3"))
+        self.min_leverage = int(os.getenv("MIN_LEVERAGE", "3"))
+        self.max_leverage = int(os.getenv("MAX_LEVERAGE", "5"))
+        self.default_leverage = int(os.getenv("DEFAULT_LEVERAGE", "3"))
         self.poll_interval = float(os.getenv("POLL_INTERVAL_SECONDS", "3.0"))
 
         self.client = OKXClient(
@@ -84,9 +104,12 @@ class LenaAggressiveBot:
             details = res["data"][0].get("details", [])
             for d in details:
                 if d.get("ccy") == "USDC":
-                    return float(d.get("eq", d.get("availBal", 0.0)))
-            total_eq = res["data"][0].get("totalEq", 0.0)
-            return float(total_eq)
+                    avail = float(d.get("availBal", 0.0))
+                    eq = float(d.get("eq", 0.0))
+                    return max(avail, eq)
+            total_eq = float(res["data"][0].get("totalEq", 0.0))
+            if total_eq > 0:
+                return total_eq
         return 0.0
 
     def compute_orderbook_imbalance(self, inst_id: str) -> float:
@@ -100,53 +123,85 @@ class LenaAggressiveBot:
         total_vol = bid_vol + ask_vol
         if total_vol == 0:
             return 0.0
-        # Positive = strong buying pressure, Negative = selling pressure
         return (bid_vol - ask_vol) / total_vol
+
+    def calculate_leverage(self, obi: float) -> int:
+        """Scale leverage dynamically between min_leverage (3x) and max_leverage (5x)"""
+        if abs(obi) >= 0.75:
+            return self.max_leverage  # 5x on strong flow
+        elif abs(obi) >= 0.60:
+            return 4  # 4x on solid flow
+        else:
+            return self.min_leverage  # 3x on base threshold
 
     def scan_and_execute(self):
         equity = self.get_equity()
-        logging.info(f"Subaccount Stack Equity: {equity:.2f} USDC | Active Positions: {len(self.active_positions)} | Closed Trades: {len(self.trades_history)}")
+        logging.info(f"Subaccount USDC Equity: ${equity:.2f} | Active Positions: {len(self.active_positions)}/{self.max_open_positions}")
 
-        # Emergency Kill Switch Check (Only trigger if free USDC is zero AND no active positions exist, or total eq < 10)
-        if equity > 0 and equity < self.kill_switch_min_equity and len(self.active_positions) == 0:
-            logging.critical(f"KILL-SWITCH TRIGGERED: Equity ({equity:.2f} USDC) is below minimum threshold ({self.kill_switch_min_equity} USDC). Halting execution!")
+        if equity < self.kill_switch_min_equity:
+            logging.critical(f"Equity (${equity:.2f}) below kill switch threshold (${self.kill_switch_min_equity:.2f})! Halting new executions.")
             return
 
         for symbol in self.symbols:
             try:
-                obi = self.compute_orderbook_imbalance(symbol)
                 ticker_resp = self.client.get_ticker(symbol)
                 if ticker_resp.get("code") != "0" or not ticker_resp.get("data"):
                     continue
 
                 last_price = float(ticker_resp["data"][0].get("last", 0))
+                if last_price <= 0:
+                    continue
+
+                obi = self.compute_orderbook_imbalance(symbol)
                 logging.info(f"[{symbol}] Price: {last_price} | Order Book Imbalance: {obi:+.2%}")
 
-                # Signal generation: High positive imbalance indicates aggressive buyer absorption
-                if obi >= self.imbalance_threshold and symbol not in self.active_positions:
+                is_futures = ("_UM_XPERP" in symbol or "-SWAP" in symbol)
+                if abs(obi) >= self.imbalance_threshold and symbol not in self.active_positions:
                     if len(self.active_positions) >= self.max_open_positions:
-                        logging.info(f"Max active positions reached ({len(self.active_positions)}/{self.max_open_positions}). Skipping buy on {symbol}.")
+                        logging.info(f"Max active positions reached ({len(self.active_positions)}/{self.max_open_positions}). Skipping {symbol}.")
                         continue
-                    trade_size_usdc = min(equity * self.risk_per_trade_pct, equity * 0.95)
-                    if trade_size_usdc >= 10.0:  # Minimum viable order
-                        qty = trade_size_usdc / last_price
-                        logging.info(f"🚀 BUY SIGNAL on {symbol}! OBI={obi:+.2%}. Allocating {trade_size_usdc:.2f} USDC (~{qty:.4f} units)")
-                        
-                        # Execute market buy order
-                        order_res = self.client.place_order(
-                            inst_id=symbol,
-                            td_mode="cash",
-                            side="buy",
-                            ord_type="market",
-                            sz=f"{trade_size_usdc:.2f}"
-                        )
-                        logging.info(f"Order Response: {order_res}")
 
+                    side = "buy" if obi > 0 else "sell"
+                    pos_side = "net"
+                    leverage = self.calculate_leverage(obi) if is_futures else 1
+
+                    if is_futures:
+                        lev_res = self.client.set_leverage(lever=str(leverage), mgn_mode="cross", inst_id=symbol)
+                        logging.info(f"Configured {leverage}x Cross Leverage for {symbol}: {lev_res.get('msg', 'OK')}")
+
+                    trade_budget_usdc = min(equity * self.risk_per_trade_pct, equity * 0.90)
+                    if trade_budget_usdc < 5.0:
+                        continue
+
+                    spec = CONTRACT_SPECS.get(symbol, {"ctVal": 1.0, "minSz": 1})
+                    contract_val_usd = spec["ctVal"] * last_price
+                    if contract_val_usd <= 0:
+                        continue
+
+                    effective_purchasing_power = trade_budget_usdc * leverage
+                    num_contracts = max(spec["minSz"], int(effective_purchasing_power / contract_val_usd))
+
+                    logging.info(f"🚀 {side.upper()} SIGNAL on {symbol}! OBI={obi:+.2%} | Leverage={leverage}x | Executing {num_contracts} contracts (~${num_contracts * contract_val_usd:.2f} notional)")
+
+                    order_res = self.client.place_order(
+                        inst_id=symbol,
+                        td_mode="cross" if is_futures else "cash",
+                        side=side,
+                        ord_type="market",
+                        sz=str(num_contracts) if is_futures else f"{trade_budget_usdc:.2f}",
+                        pos_side=pos_side
+                    )
+                    logging.info(f"OKX Order Response: {order_res}")
+
+                    if order_res.get("code") == "0":
                         self.active_positions[symbol] = {
                             "entry_price": last_price,
                             "high_price": last_price,
-                            "allocated_usdc": trade_size_usdc,
-                            "qty": qty,
+                            "low_price": last_price,
+                            "side": side.upper(),
+                            "leverage": leverage,
+                            "num_contracts": num_contracts,
+                            "allocated_usdc": trade_budget_usdc,
                             "time": time.time(),
                             "order_res": order_res
                         }
@@ -156,25 +211,28 @@ class LenaAggressiveBot:
                 if symbol in self.active_positions:
                     pos = self.active_positions[symbol]
                     entry_px = pos["entry_price"]
-                    pnl_pct = (last_price - entry_px) / entry_px
-                    
+                    side = pos.get("side", "BUY")
+
+                    lev = pos.get("leverage", 1)
+                    raw_move = (last_price - entry_px) / entry_px if side == "BUY" else (entry_px - last_price) / entry_px
+                    leveraged_pnl = raw_move * lev
+
                     if last_price > pos.get("high_price", entry_px):
                         pos["high_price"] = last_price
+                    if last_price < pos.get("low_price", entry_px):
+                        pos["low_price"] = last_price
 
                     high_px = pos.get("high_price", entry_px)
                     trailing_drop = (high_px - last_price) / high_px if high_px > 0 else 0
 
-                    # Check TP
-                    if pnl_pct >= self.take_profit_pct:
-                        logging.info(f"🎯 TAKE PROFIT TRIGGERED on {symbol}! Gain: +{pnl_pct*100:.2f}%. Closing position.")
+                    if leveraged_pnl >= self.take_profit_pct:
+                        logging.info(f"🎯 TAKE PROFIT TRIGGERED on {symbol}! Gain: +{leveraged_pnl*100:.2f}%. Closing position.")
                         self.close_position(symbol, last_price=last_price, reason="TAKE_PROFIT")
-                    # Check SL
-                    elif pnl_pct <= -self.stop_loss_pct:
-                        logging.warning(f"🛑 STOP LOSS TRIGGERED on {symbol}! Loss: {pnl_pct*100:.2f}%. Cut loss cleanly.")
+                    elif leveraged_pnl <= -self.stop_loss_pct:
+                        logging.warning(f"🛑 STOP LOSS TRIGGERED on {symbol}! Loss: {leveraged_pnl*100:.2f}%. Cutting loss.")
                         self.close_position(symbol, last_price=last_price, reason="STOP_LOSS")
-                    # Check Trailing Stop Lock
-                    elif pnl_pct > 0.015 and trailing_drop >= self.trailing_stop_pct:
-                        logging.info(f"🔒 TRAILING PROFIT LOCK TRIGGERED on {symbol}! Secured +{pnl_pct*100:.2f}%.")
+                    elif leveraged_pnl > 0.02 and trailing_drop >= self.trailing_stop_pct:
+                        logging.info(f"🔒 TRAILING PROFIT LOCK TRIGGERED on {symbol}! Locked in +{leveraged_pnl*100:.2f}%.")
                         self.close_position(symbol, last_price=last_price, reason="TRAILING_STOP")
 
             except Exception as e:
@@ -182,89 +240,71 @@ class LenaAggressiveBot:
 
     def close_position(self, symbol: str, last_price: Optional[float] = None, reason: str = "MANUAL_CLOSE"):
         if symbol not in self.active_positions:
-            logging.warning(f"Cannot close position for {symbol}: Not in active positions.")
             return
 
         pos = self.active_positions[symbol]
-        base_ccy = symbol.split("-")[0]
+        side = pos.get("side", "BUY")
+        close_side = "sell" if side == "BUY" else "buy"
+        num_contracts = pos.get("num_contracts", 1)
+        is_futures = ("_UM_XPERP" in symbol or "-SWAP" in symbol)
 
         if not last_price:
-            ticker_resp = self.client.get_ticker(symbol)
-            if ticker_resp.get("code") == "0" and ticker_resp.get("data"):
-                last_price = float(ticker_resp["data"][0].get("last", pos["entry_price"]))
-            else:
-                last_price = pos["entry_price"]
+            ticker = self.client.get_ticker(symbol)
+            last_price = float(ticker.get("data", [{}])[0].get("last", pos["entry_price"]))
 
-        logging.info(f"Closing position for {symbol} at market price {last_price} (Reason: {reason})...")
+        logging.info(f"Closing position {symbol} ({side}) at market price {last_price} (Reason: {reason})...")
 
-        # Query available base currency to sell
-        avail_qty = 0.0
-        bal_res = self.client.get_balance(base_ccy)
-        if bal_res.get("code") == "0" and bal_res.get("data"):
-            details = bal_res["data"][0].get("details", [])
-            for d in details:
-                if d.get("ccy") == base_ccy:
-                    avail_qty = float(d.get("availBal", 0.0))
+        order_res = self.client.place_order(
+            inst_id=symbol,
+            td_mode="cross" if is_futures else "cash",
+            side=close_side,
+            ord_type="market",
+            sz=str(num_contracts) if is_futures else f"{pos.get('allocated_usdc', 10.0):.2f}",
+            pos_side="net"
+        )
+        logging.info(f"Close Order Response: {order_res}")
 
-        sell_qty = avail_qty if avail_qty > 0 else float(pos.get("qty", 0.0))
-        
-        # Format precision according to instrument standards
-        sz_str = f"{sell_qty:.4f}" if sell_qty < 100 else f"{sell_qty:.2f}"
-        if sell_qty > 0:
-            order_res = self.client.place_order(
-                inst_id=symbol,
-                td_mode="cash",
-                side="sell",
-                ord_type="market",
-                sz=sz_str
-            )
-            logging.info(f"OKX Market Sell Order Response: {order_res}")
-        else:
-            logging.warning(f"No available balance found to sell for {symbol}. Recording paper exit.")
-
-        # Compute Realized PnL
-        allocated_usdc = float(pos.get("allocated_usdc", sell_qty * pos["entry_price"]))
-        realized_usdc = sell_qty * last_price if sell_qty > 0 else allocated_usdc * (last_price / pos["entry_price"])
-        realized_pnl = realized_usdc - allocated_usdc
-        pnl_pct = ((last_price - pos["entry_price"]) / pos["entry_price"]) * 100
+        lev = pos.get("leverage", 1)
+        raw_move = (last_price - pos["entry_price"]) / pos["entry_price"] if side == "BUY" else (pos["entry_price"] - last_price) / pos["entry_price"]
+        pnl_pct = raw_move * lev * 100
+        realized_pnl = (pos.get("allocated_usdc", 15.0) * pnl_pct) / 100
 
         closed_trade = {
             "id": f"TRD-LENA-{int(time.time()*1000)}",
-            "bot": "Lena (Aggressive Scalper)",
+            "bot": "Aggressiva Lena",
             "symbol": symbol,
-            "side": "SELL",
+            "side": side,
+            "leverage": lev,
             "entry_price": pos["entry_price"],
             "exit_price": last_price,
-            "size_units": round(sell_qty, 4),
-            "notional_usd": round(realized_usdc, 2),
+            "size_units": num_contracts,
+            "notional_usd": round(pos.get("allocated_usdc", 15.0) * lev, 2),
             "realized_pnl": round(realized_pnl, 2),
             "pnl_pct": round(pnl_pct, 2),
             "exit_reason": reason,
-            "entry_time": time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(pos.get("time", time.time()))),
-            "exit_time": time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
+            "entry_time": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(pos.get("time", time.time()))),
+            "exit_time": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             "status": "CLOSED"
         }
-
         self.trades_history.insert(0, closed_trade)
         del self.active_positions[symbol]
         self.save_state()
-        logging.info(f"✅ Closed trade recorded: PnL=${realized_pnl:+.2f} ({pnl_pct:+.2f}%)")
+        logging.info(f"✅ Closed trade recorded: PnL=${realized_pnl:+.2f} ({pnl_pct:+.2f}%) with {lev}x leverage")
 
     def sync_exchange_history(self):
-        """Fetch real historical fills from OKX and merge into trades_history.json"""
-        logging.info("Querying OKX for recent order history and fills...")
-        history_resp = self.client.get_order_history(inst_type="SPOT", limit=30)
+        logging.info("Querying OKX for recent futures and order history...")
+        history_resp = self.client.get_order_history(inst_type="FUTURES", limit=20)
         if history_resp.get("code") == "0" and history_resp.get("data"):
-            logging.info(f"Fetched {len(history_resp['data'])} historical orders from OKX.")
             for o in history_resp["data"]:
                 fill_px = float(o.get("fillPx", o.get("avgPx", 0)))
                 sz = float(o.get("accFillSz", o.get("sz", 0)))
                 if fill_px > 0 and sz > 0:
                     trade_record = {
                         "id": f"OKX-{o.get('ordId', int(time.time()))}",
-                        "bot": "Lena (Aggressive Scalper)",
+                        "bot": "Aggressiva Lena",
                         "symbol": o.get("instId"),
                         "side": o.get("side", "").upper(),
+                        "leverage": self.min_leverage,
                         "entry_price": fill_px,
                         "exit_price": fill_px,
                         "size_units": sz,
@@ -272,8 +312,8 @@ class LenaAggressiveBot:
                         "realized_pnl": 0.0,
                         "pnl_pct": 0.0,
                         "exit_reason": "EXCHANGE_FILL",
-                        "entry_time": time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(int(o.get("cTime", 0))/1000)),
-                        "exit_time": time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(int(o.get("uTime", 0))/1000)),
+                        "entry_time": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(int(o.get("cTime", 0))/1000)),
+                        "exit_time": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(int(o.get("uTime", 0))/1000)),
                         "status": "CLOSED"
                     }
                     if not any(t.get("id") == trade_record["id"] for t in self.trades_history):
@@ -283,8 +323,7 @@ class LenaAggressiveBot:
     def run(self, max_cycles=None, sync_history=False):
         if sync_history:
             self.sync_exchange_history()
-
-        logging.info(f"Starting Aggressive Lena Execution Loop (cycles={max_cycles or 'continuous'})...")
+        logging.info(f"Starting Aggressive Lena Futures Execution Loop (cycles={max_cycles or 'continuous'})...")
         cycle = 0
         while True:
             cycle += 1
@@ -293,19 +332,16 @@ class LenaAggressiveBot:
                 self.scan_and_execute()
             except Exception as err:
                 logging.error(f"Execution error in cycle {cycle}: {err}")
-
             if max_cycles and cycle >= max_cycles:
                 logging.info(f"Completed {max_cycles} scheduled scalp cycles successfully.")
                 break
-
             time.sleep(self.poll_interval)
 
 if __name__ == "__main__":
     import argparse
-    parser = argparse.ArgumentParser(description="Lena Aggressive Scalper")
+    parser = argparse.ArgumentParser(description="Lena Aggressive Futures Scalper")
     parser.add_argument("--cycles", type=int, default=None, help="Number of scan cycles to run before exiting")
     parser.add_argument("--sync-history", action="store_true", help="Sync exchange fills and order history on startup")
     args = parser.parse_args()
-
     bot = LenaAggressiveBot()
     bot.run(max_cycles=args.cycles, sync_history=args.sync_history)
