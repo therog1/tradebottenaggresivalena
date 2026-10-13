@@ -144,15 +144,25 @@ class LenaAggressiveBot:
             # Spot cash market sell
             del self.active_positions[symbol]
 
-    def run(self):
-        logging.info("Starting Aggressive Lena Execution Loop...")
+    def run(self, max_cycles=None):
+        logging.info(f"Starting Aggressive Lena Execution Loop (cycles={max_cycles or 'continuous'})...")
+        cycle = 0
         while True:
+            cycle += 1
             try:
+                logging.info(f"--- SCALP SCAN CYCLE #{cycle} ---")
                 self.scan_and_execute()
             except Exception as err:
-                logging.error(f"Execution error: {err}")
+                logging.error(f"Execution error in cycle {cycle}: {err}")
+            if max_cycles and cycle >= max_cycles:
+                logging.info(f"Completed {max_cycles} scheduled scalp cycles successfully.")
+                break
             time.sleep(self.poll_interval)
 
 if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description="Lena Aggressive Scalper")
+    parser.add_argument("--cycles", type=int, default=None, help="Number of scan cycles to run before exiting")
+    args = parser.parse_args()
     bot = LenaAggressiveBot()
-    bot.run()
+    bot.run(max_cycles=args.cycles)

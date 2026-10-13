@@ -1,0 +1,43 @@
+name: Lena Aggressive Scalper
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '*/15 * * * *'
+
+jobs:
+  scalp:
+    name: Execute Ken Griffin Momentum Scalp Cycle
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Lena Aggressive Scalper
+        env:
+          OKX_API_KEY: ${{ secrets.OKX_API_KEY }}
+          OKX_API_SECRET: ${{ secrets.OKX_API_SECRET }}
+          OKX_API_PASSPHRASE: ${{ secrets.OKX_API_PASSPHRASE }}
+          OKX_IS_DEMO: ${{ secrets.OKX_IS_DEMO }}
+          OKX_BASE_URL: ${{ secrets.OKX_BASE_URL }}
+          SYMBOLS: "SOL-USDC,SUI-USDC,BTC-USDC,ETH-USDC,DOGE-USDC,XRP-USDC,PEPE-USDC,AVAX-USDC"
+          RISK_PER_TRADE_PERCENT: 0.35
+          STOP_LOSS_PERCENT: 0.018
+          TAKE_PROFIT_PERCENT: 0.040
+          TRAILING_STOP_PERCENT: 0.009
+          KILL_SWITCH_MIN_EQUITY: 30.0
+        run: |
+          python bot.py --cycles 6
