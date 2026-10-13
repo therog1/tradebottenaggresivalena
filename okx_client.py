@@ -1,5 +1,6 @@
 """
 OKX REST Client for Aggressive Execution (Subaccount: Lena)
+Enhanced with Order History & Fills retrieval
 """
 import os
 import time
@@ -32,7 +33,6 @@ class OKXClient:
             import urllib.parse
             query_str = "?" + urllib.parse.urlencode(params)
             url += query_str
-
         body_str = ""
         if data:
             import json
@@ -40,14 +40,13 @@ class OKXClient:
 
         timestamp = self._get_timestamp()
         sign = self._sign(timestamp, method, path + query_str, body_str)
-
         headers = {
             "OK-ACCESS-KEY": self.api_key,
             "OK-ACCESS-SIGN": sign,
             "OK-ACCESS-TIMESTAMP": timestamp,
             "OK-ACCESS-PASSPHRASE": self.passphrase,
             "Content-Type": "application/json",
-            "User-Agent": "TradebottenLena/1.0"
+            "User-Agent": "TradebottenLena/1.1"
         }
         if self.is_demo:
             headers["x-simulated-trading"] = "1"
@@ -58,8 +57,11 @@ class OKXClient:
         except Exception as e:
             return {"code": "-1", "msg": str(e), "data": []}
 
-    def get_balance(self, ccy: str = "USDC") -> Dict[str, Any]:
-        return self._request("GET", f"/api/v5/account/balance?ccy={ccy}")
+    def get_balance(self, ccy: Optional[str] = None) -> Dict[str, Any]:
+        path = "/api/v5/account/balance"
+        if ccy:
+            path += f"?ccy={ccy}"
+        return self._request("GET", path)
 
     def get_ticker(self, inst_id: str) -> Dict[str, Any]:
         return self._request("GET", f"/api/v5/market/ticker?instId={inst_id}")
@@ -67,7 +69,7 @@ class OKXClient:
     def get_orderbook(self, inst_id: str, sz: int = 20) -> Dict[str, Any]:
         return self._request("GET", f"/api/v5/market/books?instId={inst_id}&sz={sz}")
 
-    def place_order(self, inst_id: str, td_mode: str, side: str, ord_type: str, sz: str, px: Optional[str] = None) -> Dict[str, Any]:
+    def place_order(self, inst_id: str, td_mode: str, side: str, ord_type: str, sz: str, px: Optional[str] = None, tgt_ccy: Optional[str] = None) -> Dict[str, Any]:
         payload: Dict[str, Any] = {
             "instId": inst_id,
             "tdMode": td_mode,
@@ -75,6 +77,8 @@ class OKXClient:
             "ordType": ord_type,
             "sz": sz
         }
+        if tgt_ccy:
+            payload["tgtCcy"] = tgt_ccy
         if px and ord_type in ("limit", "post_only"):
             payload["px"] = px
         return self._request("POST", "/api/v5/trade/order", data=payload)
@@ -84,6 +88,18 @@ class OKXClient:
         if inst_id:
             path += f"?instId={inst_id}"
         return self._request("GET", path)
+
+    def get_order_history(self, inst_type: str = "SPOT", inst_id: Optional[str] = None, state: str = "filled", limit: int = 50) -> Dict[str, Any]:
+        params = {"instType": inst_type, "state": state, "limit": str(limit)}
+        if inst_id:
+            params["instId"] = inst_id
+        return self._request("GET", "/api/v5/trade/orders-history", params=params)
+
+    def get_fills(self, inst_type: str = "SPOT", inst_id: Optional[str] = None, limit: int = 50) -> Dict[str, Any]:
+        params = {"instType": inst_type, "limit": str(limit)}
+        if inst_id:
+            params["instId"] = inst_id
+        return self._request("GET", "/api/v5/trade/fills", params=params)
 
     def cancel_order(self, inst_id: str, ord_id: str) -> Dict[str, Any]:
         return self._request("POST", "/api/v5/trade/cancel-order", data={"instId": inst_id, "ordId": ord_id})
