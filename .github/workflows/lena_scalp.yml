@@ -5,6 +5,9 @@ on:
   schedule:
     - cron: '*/15 * * * *'
 
+permissions:
+  contents: write
+
 jobs:
   scalp:
     name: Execute Ken Griffin Momentum Scalp Cycle
@@ -40,4 +43,16 @@ jobs:
           TRAILING_STOP_PERCENT: 0.009
           KILL_SWITCH_MIN_EQUITY: 30.0
         run: |
-          python bot.py --cycles 6
+          python bot.py --cycles 6 --sync-history
+
+      - name: Commit Updated Positions and History
+        run: |
+          git config --global user.name "Lena Tradebot Engine"
+          git config --global user.email "lena-bot@users.noreply.github.com"
+          git add active_positions.json trades_history.json 2>/dev/null || true
+          if git diff --staged --quiet; then
+            echo "No trade state changes to commit."
+          else
+            git commit -m "Auto-persist Lena active positions and trade history"
+            git push origin main
+          fi
