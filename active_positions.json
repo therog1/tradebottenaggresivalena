@@ -1,1 +1,47 @@
-{}
+{
+  "XRP-USD_UM_XPERP-310404": {
+    "entry_price": 1.3227,
+    "side": "BUY",
+    "leverage": 3,
+    "num_contracts": 10.0,
+    "sl_price": 1.2988914,
+    "tp_price": 1.375608,
+    "risk_usd": 0.23808599999999958,
+    "high_price": 1.3227,
+    "low_price": 1.3226,
+    "time": 1792003169.908448,
+    "ord_id": "4009780445238579200",
+    "cl_ord_id": "lena1792003169313",
+    "sl_attached": true
+  },
+  "LINK-USD_UM_XPERP-310523": {
+    "entry_price": 12.372,
+    "side": "BUY",
+    "leverage": 3,
+    "num_contracts": 1.0,
+    "sl_price": 12.148322,
+    "tp_price": 12.86584,
+    "risk_usd": 0.2236779999999996,
+    "high_price": 12.372,
+    "low_price": 12.372,
+    "time": 1792003172.2374284,
+    "ord_id": "4009780522246000640",
+    "cl_ord_id": "lena1792003171589",
+    "sl_attached": true
+  },
+  "ETH-USD_UM_XPERP-310404": {
+    "entry_price": 2422.9,
+    "side": "SELL",
+    "leverage": 3,
+    "num_contracts": 4.0,
+    "sl_price": 2466.4613,
+    "tp_price": 2325.9359999999997,
+    "risk_usd": 0.17424519999999938,
+    "high_price": 2422.9,
+    "low_price": 2422.9,
+    "time": 1792003178.158329,
+    "ord_id": "4009780720754020352",
+    "cl_ord_id": "lena1792003177523",
+    "sl_attached": true
+  }
+}
