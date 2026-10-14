@@ -124,3 +124,24 @@ def test_exchange_closed_position_removed_after_sl(mk):
     f = FakeOKX(positions=[]); b = mk(f, local)
     assert b.preflight()
     assert SYM not in b.active_positions
+
+
+def test_open_risk_uses_risk_usd_when_present(mk):
+    b = mk(FakeOKX(), local={SYM: {"entry_price": 1.0, "num_contracts": 10, "risk_usd": 0.42}})
+    assert b._open_risk_usd() == pytest.approx(0.42)
+
+def test_open_risk_legacy_record_with_sl_price(mk):
+    b = mk(FakeOKX(), local={SYM: {"entry_price": 1.3686, "sl_price": 1.30, "num_contracts": 51}})
+    assert b._open_risk_usd() == pytest.approx(abs(1.3686 - 1.30) * 1.0 * 51)
+
+def test_open_risk_legacy_record_uses_exchange_sl(mk):
+    local = {SYM: {"entry_price": 1.3686, "num_contracts": 51}}
+    f = FakeOKX(positions=[{"instId": SYM, "pos": "51"}], algos=[{"instId": SYM, "slTriggerPx": "1.3025"}])
+    b = mk(f, local=local)
+    b.preflight()
+    assert b._open_risk_usd() == pytest.approx(abs(1.3686 - 1.3025) * 51)
+
+def test_open_risk_legacy_record_without_any_sl_is_not_zero(mk):
+    b = mk(FakeOKX(), local={SYM: {"entry_price": 1.3686, "num_contracts": 51}})
+    assert b._open_risk_usd() == pytest.approx(1.3686 * b.stop_loss_pct * 51)
+    assert b._open_risk_usd() > 0

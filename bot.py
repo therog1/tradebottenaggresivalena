@@ -66,6 +66,7 @@ class LenaAggressiveBot:
         self.kill_switch_file = os.getenv("KILL_SWITCH_FILE", os.path.join(os.path.dirname(os.path.abspath(__file__)), "KILL_SWITCH"))
         self.block_reasons: List[str] = []
         self.exchange_positions: Dict[str, Any] = {}
+        self.exchange_sl: Dict[str, float] = {}
         self.kill_switch_min_equity = float(os.getenv("KILL_SWITCH_MIN_EQUITY", "25.0"))
         self.max_open_positions = int(os.getenv("MAX_OPEN_POSITIONS", "3"))
         self.min_leverage = int(os.getenv("MIN_LEVERAGE", "3"))
@@ -147,6 +148,12 @@ class LenaAggressiveBot:
             if lp.get("sl_attached") and inst not in exch_live:
                 logging.info(f"{inst} finns inte längre hos OKX – stängd av exchange-SL/TP. Tas bort ur lokal state.")
                 self._record_close(inst, lp, None, "EXCHANGE_SL_TP_OR_EXTERNAL")
+        for o in algo.get("data", []):
+            try:
+                if o.get("slTriggerPx"):
+                    self.exchange_sl[o["instId"]] = float(o["slTriggerPx"])
+            except (TypeError, ValueError, KeyError):
+                pass
         rec = reconcile(self.active_positions, pos.get("data", []), algo.get("data", []), list(CONTRACT_SPECS))
         self.exchange_positions = rec["exchange"]
         if not rec["ok"]:
@@ -160,8 +167,24 @@ class LenaAggressiveBot:
         return bool(self.block_reasons)
 
     # ------------------------------------------------------------------ entry
+    def _position_risk_usd(self, inst: str, p: Dict[str, Any]) -> float:
+        """Risk för en öppen position. Äldre poster saknar risk_usd -> räkna
+        abs(entry - sl) * ctVal * contracts. SL tas från posten, annars från OKX
+        algo-order, annars konservativt från STOP_LOSS_PERCENT. Aldrig 0 om entry finns."""
+        if p.get("risk_usd") is not None:
+            return float(p["risk_usd"])
+        entry = float(p.get("entry_price") or 0)
+        contracts = abs(float(p.get("num_contracts") or 0))
+        ct_val = float(CONTRACT_SPECS.get(inst, {}).get("ctVal", 1.0))
+        sl = p.get("sl_price") or self.exchange_sl.get(inst)
+        if sl:
+            dist = abs(entry - float(sl))
+        else:
+            dist = entry * self.stop_loss_pct
+        return dist * ct_val * contracts
+
     def _open_risk_usd(self) -> float:
-        return sum(float(p.get("risk_usd", 0)) for p in self.active_positions.values())
+        return sum(self._position_risk_usd(i, p) for i, p in self.active_positions.items())
 
     def try_entry(self, symbol: str, equity: float):
         if self.risk_blocked or symbol in self.active_positions:
