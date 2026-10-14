@@ -50,7 +50,7 @@ jobs:
           DEFAULT_LEVERAGE: "3"
           RISK_PER_TRADE_FRACTION: "0.01"
           MAX_MARGIN_FRACTION_PER_TRADE: "0.10"
-          MAX_OPEN_POSITIONS: "1"
+          MAX_OPEN_POSITIONS: "3"
           MAX_TOTAL_RISK_FRACTION: "0.03"
           MAX_BOOK_AGE_SECONDS: "2.0"
           MAX_SPREAD_FRACTION: "0.0015"
