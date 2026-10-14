@@ -72,7 +72,24 @@ def size_contracts(equity: float, entry: float, sl_price: float, ct_val: float, 
     if sz < min_sz:
         return {"ok": False, "reason": f"BELOW_MIN_SIZE(raw={raw:.4f},min={min_sz})"}
     return {"ok": True, "contracts": round(sz, 8), "risk_usd": sz * loss_per_ct,
-            "notional_usd": sz * ct_val * entry, "margin_usd": sz * ct_val * entry / leverage}
+            "notional_usd": sz * ct_val * entry, "margin_usd": sz * ct_val * entry / leverage,
+            "margin_limited": by_margin < by_risk}
+
+
+def choose_leverage(equity: float, entry: float, sl_price: float, ct_val: float, min_sz: float, lot_sz: float,
+                    min_lev: int, max_lev: int, risk_per_trade: float, max_margin_frac: float,
+                    open_risk_usd: float = 0.0, max_total_risk: float = 0.03) -> Tuple[int, Dict[str, Any]]:
+    """Lägsta hävstång i [min_lev..max_lev] där marginaltaket inte längre krymper
+    den riskbaserade storleken. Risken per affär ändras inte av hävstången."""
+    last: Dict[str, Any] = {"ok": False, "reason": "BAD_LEVERAGE_RANGE"}
+    for lev in range(int(min_lev), int(max_lev) + 1):
+        last = size_contracts(equity, entry, sl_price, ct_val, min_sz, lot_sz, lev, risk_per_trade,
+                              max_margin_frac, open_risk_usd, max_total_risk)
+        if last.get("ok") and not last.get("margin_limited"):
+            return lev, last
+        if not last.get("ok") and not str(last.get("reason", "")).startswith("BELOW_MIN_SIZE"):
+            return lev, last  # risk/indata-fel: mer hävstång hjälper inte
+    return int(max_lev), last
 
 
 def trailing_hit(side: str, entry: float, extreme: float, last: float, trail_pct: float,
