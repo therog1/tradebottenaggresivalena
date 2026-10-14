@@ -1,5 +1,19 @@
 [
   {
+    "id": "TRD-LENA-1792003102008",
+    "bot": "Aggressiva Lena",
+    "symbol": "XRP-USD_UM_XPERP-310404",
+    "side": "BUY",
+    "leverage": 4,
+    "entry_price": 1.3686,
+    "exit_price": 1.3246,
+    "size_units": 51,
+    "realized_pnl": -2.244,
+    "exit_reason": "MANUAL_CLOSE_ROGER",
+    "status": "CLOSED",
+    "exit_time": "2026-10-14T18:38:22Z"
+  },
+  {
     "id": "OKX-4006256310453587968",
     "bot": "Lena (Aggressive Scalper)",
     "symbol": "INJ-USDC",
