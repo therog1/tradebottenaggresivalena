@@ -8,6 +8,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: lena-scalp-okx
+  cancel-in-progress: false
+
 jobs:
   scalp:
     name: Execute Ken Griffin 3x-5x Futures Scalp Cycle
@@ -29,11 +33,14 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Unit tests (mock OKX) – avbryt om de fallerar
+        run: python -m pytest -q tests
+
       - name: Run Lena Aggressive Scalper
         env:
-          OKX_API_KEY: ${{ secrets.OKX_AGGR_KEY || secrets.OKX_API_KEY }}
-          OKX_API_SECRET: ${{ secrets.OKX_AGGR_SECRET || secrets.OKX_API_SECRET }}
-          OKX_API_PASSPHRASE: ${{ secrets.OKX_AGGR_PASS || secrets.OKX_API_PASSPHRASE }}
+          OKX_API_KEY: ${{ secrets.OKX_AGGR_KEY }}
+          OKX_API_SECRET: ${{ secrets.OKX_AGGR_SECRET }}
+          OKX_API_PASSPHRASE: ${{ secrets.OKX_AGGR_PASS }}
           OKX_IS_DEMO: "false"
           OKX_BASE_URL: "https://eea.okx.com"
           SYMBOLS: "BTC-USD_UM_XPERP-310404,ETH-USD_UM_XPERP-310404,SOL-USD_UM_XPERP-310404,SUI-USD_UM_XPERP-310404,DOGE-USD_UM_XPERP-310404,XRP-USD_UM_XPERP-310404,PEPE-USD_UM_XPERP-310404,AVAX-USD_UM_XPERP-310530,NEAR-USD_UM_XPERP-310613,LINK-USD_UM_XPERP-310523"
@@ -41,7 +48,11 @@ jobs:
           MIN_LEVERAGE: "3"
           MAX_LEVERAGE: "5"
           DEFAULT_LEVERAGE: "3"
-          RISK_PER_TRADE_PERCENT: "0.35"
+          RISK_PER_TRADE_FRACTION: "0.01"
+          MAX_MARGIN_FRACTION_PER_TRADE: "0.35"
+          MAX_TOTAL_RISK_FRACTION: "0.03"
+          MAX_BOOK_AGE_SECONDS: "2.0"
+          MAX_SPREAD_FRACTION: "0.0015"
           STOP_LOSS_PERCENT: "0.018"
           TAKE_PROFIT_PERCENT: "0.040"
           TRAILING_STOP_PERCENT: "0.009"
@@ -53,6 +64,7 @@ jobs:
         run: |
           git config --global user.name "Lena Tradebot Engine"
           git config --global user.email "lena-bot@users.noreply.github.com"
+          git pull --rebase origin main || true
           git add active_positions.json trades_history.json 2>/dev/null || true
           if git diff --staged --quiet; then
             echo "No trade state changes to commit."
