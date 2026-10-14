@@ -1,0 +1,41 @@
+name: Lena Close Position (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      inst_id:
+        description: "Instrument att stänga (reduce-only)"
+        required: true
+        default: "XRP-USD_UM_XPERP-310404"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: lena-scalp-okx
+  cancel-in-progress: false
+
+jobs:
+  close:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Close position
+        env:
+          OKX_API_KEY: ${{ secrets.OKX_AGGR_KEY }}
+          OKX_API_SECRET: ${{ secrets.OKX_AGGR_SECRET }}
+          OKX_API_PASSPHRASE: ${{ secrets.OKX_AGGR_PASS }}
+          OKX_BASE_URL: "https://eea.okx.com"
+        run: python close_one.py "${{ inputs.inst_id }}"
+      - name: Commit state
+        if: always()
+        run: |
+          git config --global user.name "Lena Tradebot Engine"
+          git config --global user.email "lena-bot@users.noreply.github.com"
+          git add active_positions.json trades_history.json
+          git diff --staged --quiet || (git commit -m "Manual close: ${{ inputs.inst_id }}" && git pull --rebase origin main && git push origin main)
