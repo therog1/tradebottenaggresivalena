@@ -11,6 +11,8 @@ import logging
 from typing import Dict, Any, List, Optional
 from dotenv import load_dotenv
 from okx_client import OKXClient
+from risk import (validate_book, orderbook_imbalance, leverage_for_obi, sl_tp_prices,
+                  size_contracts, trailing_hit, reconcile)
 
 load_dotenv()
 
@@ -52,7 +54,18 @@ class LenaAggressiveBot:
         self.take_profit_pct = float(os.getenv("TAKE_PROFIT_PERCENT", "0.040"))
         self.trailing_stop_pct = float(os.getenv("TRAILING_STOP_PERCENT", "0.009"))
         self.imbalance_threshold = float(os.getenv("IMBALANCE_THRESHOLD", "0.45"))
-        self.risk_per_trade_pct = float(os.getenv("RISK_PER_TRADE_PERCENT", "0.35"))
+        # Förlustrisk per affär (andel av verifierat saldo) vid SL-träff; 35 % behålls endast som TAK för marginal per affär.
+        self.risk_per_trade = float(os.getenv("RISK_PER_TRADE_FRACTION", "0.01"))
+        self.max_margin_frac = float(os.getenv("MAX_MARGIN_FRACTION_PER_TRADE", os.getenv("RISK_PER_TRADE_PERCENT", "0.35")))
+        self.max_total_risk = float(os.getenv("MAX_TOTAL_RISK_FRACTION", "0.03"))
+        self.max_book_age_s = float(os.getenv("MAX_BOOK_AGE_SECONDS", "2.0"))
+        self.max_spread_pct = float(os.getenv("MAX_SPREAD_FRACTION", "0.0015"))
+        self.trailing_activate_pct = float(os.getenv("TRAILING_ACTIVATE_FRACTION", "0.004"))
+        self.fill_poll_tries = int(os.getenv("FILL_POLL_TRIES", "5"))
+        self.fill_poll_interval = float(os.getenv("FILL_POLL_INTERVAL", "0.5"))
+        self.kill_switch_file = os.getenv("KILL_SWITCH_FILE", os.path.join(os.path.dirname(os.path.abspath(__file__)), "KILL_SWITCH"))
+        self.block_reasons: List[str] = []
+        self.exchange_positions: Dict[str, Any] = {}
         self.kill_switch_min_equity = float(os.getenv("KILL_SWITCH_MIN_EQUITY", "25.0"))
         self.max_open_positions = int(os.getenv("MAX_OPEN_POSITIONS", "3"))
         self.min_leverage = int(os.getenv("MIN_LEVERAGE", "3"))
@@ -98,198 +111,234 @@ class LenaAggressiveBot:
         except Exception as e:
             logging.error(f"Error saving state to disk: {e}")
 
-    def get_equity(self) -> float:
+    # ------------------------------------------------------------------ saldo
+    def get_equity(self) -> Optional[float]:
+        """Verifierat USDC-saldo. None vid API-fel (=> inga nya affärer). Aldrig max(avail, eq)."""
         res = self.client.get_balance("USDC")
-        if res.get("code") == "0" and res.get("data"):
-            details = res["data"][0].get("details", [])
-            for d in details:
-                if d.get("ccy") == "USDC":
-                    avail = float(d.get("availBal", 0.0))
-                    eq = float(d.get("eq", 0.0))
-                    return max(avail, eq)
-            total_eq = float(res["data"][0].get("totalEq", 0.0))
-            if total_eq > 0:
-                return total_eq
-        return 0.0
+        if res.get("code") != "0" or not res.get("data"):
+            logging.error(f"Balance API error: {res.get('code')} {res.get('msg')}")
+            return None
+        for d in res["data"][0].get("details", []):
+            if d.get("ccy") == "USDC":
+                vals = [float(d[k]) for k in ("availEq", "availBal", "eq") if d.get(k) not in (None, "")]
+                return min(vals) if vals else None
+        return None
+
+    def _sleep(self, s: float):
+        time.sleep(s)
 
     def compute_orderbook_imbalance(self, inst_id: str) -> float:
-        book = self.client.get_orderbook(inst_id, sz=15)
-        if book.get("code") != "0" or not book.get("data"):
-            return 0.0
-        bids = book["data"][0].get("bids", [])
-        asks = book["data"][0].get("asks", [])
-        bid_vol = sum(float(b[1]) for b in bids[:10])
-        ask_vol = sum(float(a[1]) for a in asks[:10])
-        total_vol = bid_vol + ask_vol
-        if total_vol == 0:
-            return 0.0
-        return (bid_vol - ask_vol) / total_vol
+        """Bakåtkompatibel; används inte för beslut (se try_entry)."""
+        return orderbook_imbalance(self.client.get_orderbook(inst_id, sz=15))
 
-    def calculate_leverage(self, obi: float) -> int:
-        """Scale leverage dynamically between min_leverage (3x) and max_leverage (5x)"""
-        if abs(obi) >= 0.75:
-            return self.max_leverage  # 5x on strong flow
-        elif abs(obi) >= 0.60:
-            return 4  # 4x on solid flow
+    # --------------------------------------------------------- reconciliation
+    def preflight(self) -> bool:
+        """Stäm av lokal state mot OKX. Blockerar nya riskökande affärer vid avvikelse eller API-fel.
+        Stänger ALDRIG något automatiskt; avvikande positioner rapporteras bara."""
+        self.block_reasons = []
+        pos = self.client.get_positions(inst_type="FUTURES")
+        algo = self.client.get_algo_orders_pending()
+        if pos.get("code") != "0" or algo.get("code") != "0":
+            self.block_reasons.append(f"RECONCILE_API_ERROR(pos={pos.get('code')},algo={algo.get('code')})")
+            return False
+        exch_live = {p["instId"] for p in pos.get("data", []) if float(p.get("pos") or 0) != 0}
+        for inst in list(self.active_positions):
+            lp = self.active_positions[inst]
+            if lp.get("sl_attached") and inst not in exch_live:
+                logging.info(f"{inst} finns inte längre hos OKX – stängd av exchange-SL/TP. Tas bort ur lokal state.")
+                self._record_close(inst, lp, None, "EXCHANGE_SL_TP_OR_EXTERNAL")
+        rec = reconcile(self.active_positions, pos.get("data", []), algo.get("data", []), list(CONTRACT_SPECS))
+        self.exchange_positions = rec["exchange"]
+        if not rec["ok"]:
+            self.block_reasons.extend(rec["issues"])
+            for i in rec["issues"]:
+                logging.critical(f"RECONCILIATION: {i} – nya affärer blockerade, ingenting stängs automatiskt.")
+        return rec["ok"]
+
+    @property
+    def risk_blocked(self) -> bool:
+        return bool(self.block_reasons)
+
+    # ------------------------------------------------------------------ entry
+    def _open_risk_usd(self) -> float:
+        return sum(float(p.get("risk_usd", 0)) for p in self.active_positions.values())
+
+    def try_entry(self, symbol: str, equity: float):
+        if self.risk_blocked or symbol in self.active_positions:
+            return
+        if len(self.active_positions) >= self.max_open_positions:
+            return
+        book = self.client.get_orderbook(symbol, sz=15)
+        ok, why, q = validate_book(book, self.max_book_age_s, self.max_spread_pct)
+        if not ok:
+            logging.info(f"[{symbol}] Ingen entry: {why}")
+            return
+        obi = orderbook_imbalance(book)
+        logging.info(f"[{symbol}] OBI={obi:+.2%} spread={q['spread_pct']:.4%} age={q['age_s']:.2f}s")
+        if abs(obi) < self.imbalance_threshold:
+            return
+        side = "buy" if obi > 0 else "sell"
+        ref = q["ask"] if side == "buy" else q["bid"]
+        lev = leverage_for_obi(obi, self.min_leverage, self.max_leverage)
+        sl_px, tp_px = sl_tp_prices(ref, side, self.stop_loss_pct, self.take_profit_pct)
+        spec = CONTRACT_SPECS.get(symbol)
+        if not spec:
+            logging.warning(f"[{symbol}] Saknar kontraktsspec – hoppar över.")
+            return
+        sz = size_contracts(equity, ref, sl_px, spec["ctVal"], spec["minSz"], spec.get("lotSz", spec["minSz"]),
+                            lev, self.risk_per_trade, self.max_margin_frac, self._open_risk_usd(), self.max_total_risk)
+        if not sz["ok"]:
+            logging.info(f"[{symbol}] Ingen entry: {sz['reason']}")
+            return
+        lev_res = self.client.set_leverage(lever=str(lev), mgn_mode="cross", inst_id=symbol)
+        if lev_res.get("code") != "0":
+            logging.error(f"[{symbol}] set_leverage misslyckades ({lev_res.get('msg')}) – ingen order.")
+            return
+        cl_id = f"lena{int(time.time()*1000)}"
+        attach = [{"attachAlgoClOrdId": cl_id + "sl",
+                   "slTriggerPx": f"{sl_px:.10g}", "slOrdPx": "-1", "slTriggerPxType": "last",
+                   "tpTriggerPx": f"{tp_px:.10g}", "tpOrdPx": "-1", "tpTriggerPxType": "last"}]
+        logging.info(f"[{symbol}] {side.upper()} {sz['contracts']} ct @~{ref} lev={lev}x SL={sl_px:.6g} TP={tp_px:.6g} risk=${sz['risk_usd']:.2f}")
+        res = self.client.place_order(inst_id=symbol, td_mode="cross", side=side, ord_type="market",
+                                      sz=f"{sz['contracts']:g}", pos_side="net", cl_ord_id=cl_id, attach_algo_ords=attach)
+        if res.get("code") != "0":
+            logging.error(f"[{symbol}] Order avvisad: {res}")
+            if res.get("code") in ("-1", "429"):
+                self.block_reasons.append(f"ORDER_STATE_UNKNOWN:{symbol}:{cl_id}")
+            return
+        self._verify_fill(symbol, side, cl_id, lev, sl_px, tp_px, sz)
+
+    def _verify_fill(self, symbol, side, cl_id, lev, sl_px, tp_px, sz):
+        """En accepterad order är INTE en position. Kräv filled/partially_filled från OKX."""
+        o = None
+        for _ in range(self.fill_poll_tries):
+            r = self.client.get_order(symbol, cl_ord_id=cl_id)
+            if r.get("code") == "0" and r.get("data"):
+                o = r["data"][0]
+                if o.get("state") in ("filled", "canceled", "mmp_canceled"):
+                    break
+            self._sleep(self.fill_poll_interval)
+        filled = float(o.get("accFillSz") or 0) if o else 0.0
+        if not o or filled <= 0:
+            state = o.get("state") if o else "unknown"
+            logging.critical(f"[{symbol}] Fill ej verifierad (state={state}) – blockerar nya affärer.")
+            if state not in ("canceled", "mmp_canceled"):
+                self.block_reasons.append(f"FILL_UNVERIFIED:{symbol}:{cl_id}")
+            return
+        if o.get("state") != "filled":
+            self.block_reasons.append(f"PARTIAL_FILL:{symbol}:{filled}/{sz['contracts']}")
+        avg = float(o.get("avgPx") or 0)
+        ct = CONTRACT_SPECS[symbol]["ctVal"]
+        self.active_positions[symbol] = {
+            "entry_price": avg, "side": side.upper(), "leverage": lev, "num_contracts": filled,
+            "sl_price": sl_px, "tp_price": tp_px, "risk_usd": abs(avg - sl_px) * ct * filled,
+            "high_price": avg, "low_price": avg, "time": time.time(), "ord_id": o.get("ordId"),
+            "cl_ord_id": cl_id, "sl_attached": False,
+        }
+        self._ensure_exchange_sl(symbol)
+        self.save_state()
+
+    def _ensure_exchange_sl(self, symbol):
+        """Verifiera att SL finns hos OKX; annars lägg fristående reduce-only SL/TP. Misslyckas det: blockera + larm."""
+        pos = self.active_positions[symbol]
+        for _ in range(self.fill_poll_tries):
+            algo = self.client.get_algo_orders_pending()
+            if algo.get("code") == "0" and any(a.get("instId") == symbol and a.get("slTriggerPx") for a in algo.get("data", [])):
+                pos["sl_attached"] = True
+                logging.info(f"[{symbol}] Exchange-SL verifierad hos OKX.")
+                return
+            self._sleep(self.fill_poll_interval)
+        close_side = "sell" if pos["side"] == "BUY" else "buy"
+        r = self.client.place_algo_order(symbol, "cross", close_side, f"{pos['num_contracts']:g}",
+                                         sl_trigger_px=f"{pos['sl_price']:.10g}", tp_trigger_px=f"{pos['tp_price']:.10g}")
+        if r.get("code") == "0":
+            pos["sl_attached"] = True
+            logging.warning(f"[{symbol}] attachAlgoOrds saknades – fristående SL/TP lagd.")
         else:
-            return self.min_leverage  # 3x on base threshold
+            logging.critical(f"[{symbol}] KUNDE INTE LÄGGA SL HOS OKX: {r} – blockerar, manuell åtgärd krävs.")
+            self.block_reasons.append(f"NO_EXCHANGE_SL:{symbol}")
+
+    # ------------------------------------------------------------------- exit
+    def manage_position(self, symbol: str):
+        """SL/TP ligger hos OKX. Här hanteras bara trailing (på pris, korrekt för short)."""
+        pos = self.active_positions.get(symbol)
+        if not pos or not pos.get("sl_attached") or self.risk_blocked:
+            return
+        t = self.client.get_ticker(symbol)
+        if t.get("code") != "0" or not t.get("data"):
+            return
+        last = float(t["data"][0].get("last", 0))
+        if last <= 0:
+            return
+        pos["high_price"] = max(pos.get("high_price", last), last)
+        pos["low_price"] = min(pos.get("low_price", last), last)
+        extreme = pos["high_price"] if pos["side"] == "BUY" else pos["low_price"]
+        if trailing_hit(pos["side"], pos["entry_price"], extreme, last, self.trailing_stop_pct, self.trailing_activate_pct):
+            logging.info(f"[{symbol}] Trailing stop (pris) – stänger reduce-only.")
+            self.close_position(symbol, last, "TRAILING_STOP")
 
     def scan_and_execute(self):
         equity = self.get_equity()
-        logging.info(f"Subaccount USDC Equity: ${equity:.2f} | Active Positions: {len(self.active_positions)}/{self.max_open_positions}")
-
-        if equity < self.kill_switch_min_equity:
-            logging.critical(f"Equity (${equity:.2f}) below kill switch threshold (${self.kill_switch_min_equity:.2f})! Halting new executions.")
+        if equity is None:
+            self.block_reasons.append("BALANCE_UNVERIFIED")
+            logging.critical("Saldo kunde inte verifieras – inga nya affärer.")
+        elif equity < self.kill_switch_min_equity:
+            self.block_reasons.append("KILL_SWITCH_EQUITY")
+            logging.critical(f"Equity ${equity:.2f} under kill switch ${self.kill_switch_min_equity:.2f}.")
+        if self.kill_switch_file and os.path.exists(self.kill_switch_file):
+            self.block_reasons.append("KILL_SWITCH_FILE")
+        for symbol in list(self.active_positions):
+            if symbol in CONTRACT_SPECS:
+                try:
+                    self.manage_position(symbol)
+                except Exception as e:
+                    logging.error(f"manage {symbol}: {e}")
+        if self.risk_blocked:
+            logging.warning(f"Nya affärer blockerade: {self.block_reasons}")
             return
-
         for symbol in self.symbols:
             try:
-                ticker_resp = self.client.get_ticker(symbol)
-                if ticker_resp.get("code") != "0" or not ticker_resp.get("data"):
-                    continue
-
-                last_price = float(ticker_resp["data"][0].get("last", 0))
-                if last_price <= 0:
-                    continue
-
-                obi = self.compute_orderbook_imbalance(symbol)
-                logging.info(f"[{symbol}] Price: {last_price} | Order Book Imbalance: {obi:+.2%}")
-
-                is_futures = ("_UM_XPERP" in symbol or "-SWAP" in symbol)
-                if abs(obi) >= self.imbalance_threshold and symbol not in self.active_positions:
-                    if len(self.active_positions) >= self.max_open_positions:
-                        logging.info(f"Max active positions reached ({len(self.active_positions)}/{self.max_open_positions}). Skipping {symbol}.")
-                        continue
-
-                    side = "buy" if obi > 0 else "sell"
-                    pos_side = "net"
-                    leverage = self.calculate_leverage(obi) if is_futures else 1
-
-                    if is_futures:
-                        lev_res = self.client.set_leverage(lever=str(leverage), mgn_mode="cross", inst_id=symbol)
-                        logging.info(f"Configured {leverage}x Cross Leverage for {symbol}: {lev_res.get('msg', 'OK')}")
-
-                    trade_budget_usdc = min(equity * self.risk_per_trade_pct, equity * 0.90)
-                    if trade_budget_usdc < 5.0:
-                        continue
-
-                    spec = CONTRACT_SPECS.get(symbol, {"ctVal": 1.0, "minSz": 1})
-                    contract_val_usd = spec["ctVal"] * last_price
-                    if contract_val_usd <= 0:
-                        continue
-
-                    effective_purchasing_power = trade_budget_usdc * leverage
-                    num_contracts = max(spec["minSz"], int(effective_purchasing_power / contract_val_usd))
-
-                    logging.info(f"🚀 {side.upper()} SIGNAL on {symbol}! OBI={obi:+.2%} | Leverage={leverage}x | Executing {num_contracts} contracts (~${num_contracts * contract_val_usd:.2f} notional)")
-
-                    order_res = self.client.place_order(
-                        inst_id=symbol,
-                        td_mode="cross" if is_futures else "cash",
-                        side=side,
-                        ord_type="market",
-                        sz=str(num_contracts) if is_futures else f"{trade_budget_usdc:.2f}",
-                        pos_side=pos_side
-                    )
-                    logging.info(f"OKX Order Response: {order_res}")
-
-                    if order_res.get("code") == "0":
-                        self.active_positions[symbol] = {
-                            "entry_price": last_price,
-                            "high_price": last_price,
-                            "low_price": last_price,
-                            "side": side.upper(),
-                            "leverage": leverage,
-                            "num_contracts": num_contracts,
-                            "allocated_usdc": trade_budget_usdc,
-                            "time": time.time(),
-                            "order_res": order_res
-                        }
-                        self.save_state()
-
-                # Manage active positions (Trailing Stop & Take Profit)
-                if symbol in self.active_positions:
-                    pos = self.active_positions[symbol]
-                    entry_px = pos["entry_price"]
-                    side = pos.get("side", "BUY")
-
-                    lev = pos.get("leverage", 1)
-                    raw_move = (last_price - entry_px) / entry_px if side == "BUY" else (entry_px - last_price) / entry_px
-                    leveraged_pnl = raw_move * lev
-
-                    if last_price > pos.get("high_price", entry_px):
-                        pos["high_price"] = last_price
-                    if last_price < pos.get("low_price", entry_px):
-                        pos["low_price"] = last_price
-
-                    high_px = pos.get("high_price", entry_px)
-                    trailing_drop = (high_px - last_price) / high_px if high_px > 0 else 0
-
-                    if leveraged_pnl >= self.take_profit_pct:
-                        logging.info(f"🎯 TAKE PROFIT TRIGGERED on {symbol}! Gain: +{leveraged_pnl*100:.2f}%. Closing position.")
-                        self.close_position(symbol, last_price=last_price, reason="TAKE_PROFIT")
-                    elif leveraged_pnl <= -self.stop_loss_pct:
-                        logging.warning(f"🛑 STOP LOSS TRIGGERED on {symbol}! Loss: {leveraged_pnl*100:.2f}%. Cutting loss.")
-                        self.close_position(symbol, last_price=last_price, reason="STOP_LOSS")
-                    elif leveraged_pnl > 0.02 and trailing_drop >= self.trailing_stop_pct:
-                        logging.info(f"🔒 TRAILING PROFIT LOCK TRIGGERED on {symbol}! Locked in +{leveraged_pnl*100:.2f}%.")
-                        self.close_position(symbol, last_price=last_price, reason="TRAILING_STOP")
-
+                self.try_entry(symbol, equity)
             except Exception as e:
                 logging.error(f"Error processing symbol {symbol}: {e}")
+                self.block_reasons.append(f"EXCEPTION:{symbol}")
+                return
 
     def close_position(self, symbol: str, last_price: Optional[float] = None, reason: str = "MANUAL_CLOSE"):
-        if symbol not in self.active_positions:
+        """Stänger endast positioner som denna kod själv öppnat (reduce-only)."""
+        pos = self.active_positions.get(symbol)
+        if not pos or not pos.get("cl_ord_id"):
+            logging.warning(f"Vägrar stänga {symbol}: inte öppnad av denna kod.")
             return
+        close_side = "sell" if pos["side"] == "BUY" else "buy"
+        cl_id = f"lenax{int(time.time()*1000)}"
+        res = self.client.place_order(inst_id=symbol, td_mode="cross", side=close_side, ord_type="market",
+                                      sz=f"{pos['num_contracts']:g}", pos_side="net", cl_ord_id=cl_id, reduce_only=True)
+        if res.get("code") != "0":
+            logging.error(f"Close {symbol} avvisad: {res}")
+            self.block_reasons.append(f"CLOSE_FAILED:{symbol}")
+            return
+        r = self.client.get_order(symbol, cl_ord_id=cl_id)
+        o = (r.get("data") or [{}])[0] if r.get("code") == "0" else {}
+        if o.get("state") != "filled":
+            self.block_reasons.append(f"CLOSE_UNVERIFIED:{symbol}")
+            return
+        self._record_close(symbol, pos, float(o.get("avgPx") or last_price or 0), reason)
 
-        pos = self.active_positions[symbol]
-        side = pos.get("side", "BUY")
-        close_side = "sell" if side == "BUY" else "buy"
-        num_contracts = pos.get("num_contracts", 1)
-        is_futures = ("_UM_XPERP" in symbol or "-SWAP" in symbol)
-
-        if not last_price:
-            ticker = self.client.get_ticker(symbol)
-            last_price = float(ticker.get("data", [{}])[0].get("last", pos["entry_price"]))
-
-        logging.info(f"Closing position {symbol} ({side}) at market price {last_price} (Reason: {reason})...")
-
-        order_res = self.client.place_order(
-            inst_id=symbol,
-            td_mode="cross" if is_futures else "cash",
-            side=close_side,
-            ord_type="market",
-            sz=str(num_contracts) if is_futures else f"{pos.get('allocated_usdc', 10.0):.2f}",
-            pos_side="net"
-        )
-        logging.info(f"Close Order Response: {order_res}")
-
-        lev = pos.get("leverage", 1)
-        raw_move = (last_price - pos["entry_price"]) / pos["entry_price"] if side == "BUY" else (pos["entry_price"] - last_price) / pos["entry_price"]
-        pnl_pct = raw_move * lev * 100
-        realized_pnl = (pos.get("allocated_usdc", 15.0) * pnl_pct) / 100
-
-        closed_trade = {
-            "id": f"TRD-LENA-{int(time.time()*1000)}",
-            "bot": "Aggressiva Lena",
-            "symbol": symbol,
-            "side": side,
-            "leverage": lev,
-            "entry_price": pos["entry_price"],
-            "exit_price": last_price,
-            "size_units": num_contracts,
-            "notional_usd": round(pos.get("allocated_usdc", 15.0) * lev, 2),
-            "realized_pnl": round(realized_pnl, 2),
-            "pnl_pct": round(pnl_pct, 2),
-            "exit_reason": reason,
-            "entry_time": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(pos.get("time", time.time()))),
-            "exit_time": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-            "status": "CLOSED"
-        }
-        self.trades_history.insert(0, closed_trade)
+    def _record_close(self, symbol, pos, exit_px, reason):
+        entry = pos.get("entry_price", 0)
+        pnl = None
+        if exit_px and entry:
+            move = (exit_px - entry) if pos.get("side") == "BUY" else (entry - exit_px)
+            pnl = round(move * CONTRACT_SPECS.get(symbol, {"ctVal": 0})["ctVal"] * pos.get("num_contracts", 0), 4)
+        self.trades_history.insert(0, {
+            "id": f"TRD-LENA-{int(time.time()*1000)}", "bot": "Aggressiva Lena", "symbol": symbol,
+            "side": pos.get("side"), "leverage": pos.get("leverage"), "entry_price": entry, "exit_price": exit_px,
+            "size_units": pos.get("num_contracts"), "gross_pnl_est_excl_fees_funding": pnl,
+            "exit_reason": reason, "status": "CLOSED",
+            "exit_time": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())})
         del self.active_positions[symbol]
         self.save_state()
-        logging.info(f"✅ Closed trade recorded: PnL=${realized_pnl:+.2f} ({pnl_pct:+.2f}%) with {lev}x leverage")
 
     def sync_exchange_history(self):
         logging.info("Querying OKX for recent futures and order history...")
@@ -323,15 +372,20 @@ class LenaAggressiveBot:
     def run(self, max_cycles=None, sync_history=False):
         if sync_history:
             self.sync_exchange_history()
+        if not self.preflight():
+            logging.critical(f"Preflight-reconciliation misslyckades: {self.block_reasons}. Inga nya affärer.")
         logging.info(f"Starting Aggressive Lena Futures Execution Loop (cycles={max_cycles or 'continuous'})...")
         cycle = 0
         while True:
             cycle += 1
             try:
                 logging.info(f"--- SCALP SCAN CYCLE #{cycle} ---")
+                if cycle > 1 and not self.risk_blocked:
+                    self.preflight()
                 self.scan_and_execute()
             except Exception as err:
                 logging.error(f"Execution error in cycle {cycle}: {err}")
+                self.block_reasons.append("CYCLE_EXCEPTION")
             if max_cycles and cycle >= max_cycles:
                 logging.info(f"Completed {max_cycles} scheduled scalp cycles successfully.")
                 break
