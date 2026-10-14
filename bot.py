@@ -11,7 +11,7 @@ import logging
 from typing import Dict, Any, List, Optional
 from dotenv import load_dotenv
 from okx_client import OKXClient
-from risk import (validate_book, orderbook_imbalance, leverage_for_obi, sl_tp_prices,
+from risk import (validate_book, orderbook_imbalance, leverage_for_obi, choose_leverage, sl_tp_prices,
                   size_contracts, trailing_hit, reconcile)
 
 load_dotenv()
@@ -202,14 +202,14 @@ class LenaAggressiveBot:
             return
         side = "buy" if obi > 0 else "sell"
         ref = q["ask"] if side == "buy" else q["bid"]
-        lev = leverage_for_obi(obi, self.min_leverage, self.max_leverage)
         sl_px, tp_px = sl_tp_prices(ref, side, self.stop_loss_pct, self.take_profit_pct)
         spec = CONTRACT_SPECS.get(symbol)
         if not spec:
             logging.warning(f"[{symbol}] Saknar kontraktsspec – hoppar över.")
             return
-        sz = size_contracts(equity, ref, sl_px, spec["ctVal"], spec["minSz"], spec.get("lotSz", spec["minSz"]),
-                            lev, self.risk_per_trade, self.max_margin_frac, self._open_risk_usd(), self.max_total_risk)
+        lev, sz = choose_leverage(equity, ref, sl_px, spec["ctVal"], spec["minSz"], spec.get("lotSz", spec["minSz"]),
+                                  self.min_leverage, min(self.max_leverage, 10), self.risk_per_trade,
+                                  self.max_margin_frac, self._open_risk_usd(), self.max_total_risk)
         if not sz["ok"]:
             logging.info(f"[{symbol}] Ingen entry: {sz['reason']}")
             return

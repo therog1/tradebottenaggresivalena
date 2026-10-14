@@ -81,3 +81,23 @@ def test_reconcile_clean():
     r = reconcile({"XRP-X": {"num_contracts": 2}}, [{"instId": "XRP-X", "pos": "-2"}],
                   [{"instId": "XRP-X", "slTriggerPx": "1"}], ["XRP-X"])
     assert r["ok"]
+
+
+def test_choose_leverage_lowest_that_fits():
+    from risk import choose_leverage
+    # equity 50, risk 1% = 0.5 USD; SL 1% on entry 100, ctVal 1 -> loss/ct 1.0 -> want 0.5 ct
+    # notional 50 -> margin at 10% cap = 5 USD -> needs 10x
+    lev, sz = choose_leverage(50, 100, 99, 1, 0.01, 0.01, 3, 10, 0.01, 0.10)
+    assert lev == 10 and sz["ok"] and abs(sz["risk_usd"] - 0.5) < 1e-9
+    lev, sz = choose_leverage(50, 100, 98, 1, 0.01, 0.01, 3, 10, 0.01, 0.10)  # want 0.25 ct -> 5x
+    assert lev == 5 and not sz["margin_limited"]
+
+
+def test_choose_leverage_min_when_margin_plenty_and_never_above_max():
+    from risk import choose_leverage
+    lev, sz = choose_leverage(1000, 100, 90, 1, 0.01, 0.01, 3, 10, 0.01, 0.10)
+    assert lev == 3 and sz["ok"]
+    lev, sz = choose_leverage(50, 100, 99.9, 1, 0.01, 0.01, 3, 10, 0.01, 0.10)
+    assert lev == 10 and sz["margin_limited"]
+    # risk-per-trade unchanged regardless of leverage
+    assert sz["risk_usd"] <= 50 * 0.01 + 1e-9
