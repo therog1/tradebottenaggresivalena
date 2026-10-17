@@ -1,34 +1,4 @@
 {
-  "SUI-USD_UM_XPERP-310404": {
-    "entry_price": 1.0112,
-    "side": "SELL",
-    "leverage": 6,
-    "num_contracts": 22.0,
-    "sl_price": 1.0294016000000001,
-    "tp_price": 0.9707520000000001,
-    "risk_usd": 0.4004352000000009,
-    "high_price": 1.0112,
-    "low_price": 1.0078,
-    "time": 1792175706.0916471,
-    "ord_id": "4015569800838303744",
-    "cl_ord_id": "lena1792175705588",
-    "sl_attached": true
-  },
-  "DOGE-USD_UM_XPERP-310404": {
-    "entry_price": 0.07999,
-    "side": "BUY",
-    "leverage": 6,
-    "num_contracts": 25.0,
-    "sl_price": 0.07855018,
-    "tp_price": 0.0831896,
-    "risk_usd": 0.3599550000000021,
-    "high_price": 0.08049,
-    "low_price": 0.07999,
-    "time": 1792175707.2993405,
-    "ord_id": "4015569841606938624",
-    "cl_ord_id": "lena1792175706802",
-    "sl_attached": true
-  },
   "BTC-USD_UM_XPERP-310404": {
     "entry_price": 81588.9,
     "side": "BUY",
@@ -38,10 +8,40 @@
     "tp_price": 84852.45599999999,
     "risk_usd": 0.2937200400000002,
     "high_price": 81588.9,
-    "low_price": 81588.9,
+    "low_price": 81223.8,
     "time": 1792221154.1094177,
     "ord_id": "4017094782563176448",
     "cl_ord_id": "lena1792221153588",
+    "sl_attached": true
+  },
+  "ETH-USD_UM_XPERP-310404": {
+    "entry_price": 2403.56,
+    "side": "BUY",
+    "leverage": 6,
+    "num_contracts": 9.0,
+    "sl_price": 2360.29592,
+    "tp_price": 2499.7024,
+    "risk_usd": 0.3893767199999993,
+    "high_price": 2403.56,
+    "low_price": 2403.56,
+    "time": 1792257935.6288478,
+    "ord_id": "4018328966581506048",
+    "cl_ord_id": "lena1792257935124",
+    "sl_attached": true
+  },
+  "SUI-USD_UM_XPERP-310404": {
+    "entry_price": 0.9733,
+    "side": "BUY",
+    "leverage": 6,
+    "num_contracts": 24.0,
+    "sl_price": 0.9557806000000001,
+    "tp_price": 1.012232,
+    "risk_usd": 0.4204655999999991,
+    "high_price": 0.9733,
+    "low_price": 0.9733,
+    "time": 1792257937.272049,
+    "ord_id": "4018329021476556800",
+    "cl_ord_id": "lena1792257936757",
     "sl_attached": true
   }
 }
