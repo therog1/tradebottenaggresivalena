@@ -232,9 +232,9 @@ class LenaAggressiveBot:
                 logging.info(f"[{symbol}] Ingen entry: bekräftelse misslyckades ({why})")
                 return
             samples.append(orderbook_imbalance(book))
-        if not obi_confirmed(samples, self.imbalance_threshold):
-            logging.info(f"[{symbol}] Ingen entry: OBI höll inte ({', '.join(f'{x:+.2f}' for x in samples)})")
-            return
+            if not obi_confirmed(samples, self.imbalance_threshold):
+                logging.info(f"[{symbol}] Ingen entry: OBI höll inte ({', '.join(f'{x:+.2f}' for x in samples)})")
+                return
         ref = q["ask"] if side == "buy" else q["bid"]
         sl_px, tp_px = sl_tp_prices(ref, side, self.stop_loss_pct, self.take_profit_pct)
         spec = CONTRACT_SPECS.get(symbol)
