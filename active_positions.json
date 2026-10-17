@@ -1,19 +1,4 @@
 {
-  "SOL-USD_UM_XPERP-310404": {
-    "entry_price": 105.92,
-    "side": "SELL",
-    "leverage": 6,
-    "num_contracts": 23.0,
-    "sl_price": 107.82656,
-    "tp_price": 101.6832,
-    "risk_usd": 0.4385087999999997,
-    "high_price": 105.92,
-    "low_price": 103.78,
-    "time": 1792080812.6993096,
-    "ord_id": "4012385708512694272",
-    "cl_ord_id": "lena1792080812255",
-    "sl_attached": true
-  },
   "SUI-USD_UM_XPERP-310404": {
     "entry_price": 1.0112,
     "side": "SELL",
@@ -23,7 +8,7 @@
     "tp_price": 0.9707520000000001,
     "risk_usd": 0.4004352000000009,
     "high_price": 1.0112,
-    "low_price": 1.0112,
+    "low_price": 1.0078,
     "time": 1792175706.0916471,
     "ord_id": "4015569800838303744",
     "cl_ord_id": "lena1792175705588",
@@ -37,11 +22,26 @@
     "sl_price": 0.07855018,
     "tp_price": 0.0831896,
     "risk_usd": 0.3599550000000021,
-    "high_price": 0.07999,
+    "high_price": 0.08049,
     "low_price": 0.07999,
     "time": 1792175707.2993405,
     "ord_id": "4015569841606938624",
     "cl_ord_id": "lena1792175706802",
+    "sl_attached": true
+  },
+  "BTC-USD_UM_XPERP-310404": {
+    "entry_price": 81588.9,
+    "side": "BUY",
+    "leverage": 6,
+    "num_contracts": 2.0,
+    "sl_price": 80120.2998,
+    "tp_price": 84852.45599999999,
+    "risk_usd": 0.2937200400000002,
+    "high_price": 81588.9,
+    "low_price": 81588.9,
+    "time": 1792221154.1094177,
+    "ord_id": "4017094782563176448",
+    "cl_ord_id": "lena1792221153588",
     "sl_attached": true
   }
 }
