@@ -69,6 +69,9 @@ class OKXClient:
     def get_ticker(self, inst_id: str) -> Dict[str, Any]:
         return self._request("GET", f"/api/v5/market/ticker?instId={inst_id}")
 
+    def get_candles(self, inst_id: str, bar: str = "1H", limit: int = 100) -> Dict[str, Any]:
+        return self._request("GET", f"/api/v5/market/candles?instId={inst_id}&bar={bar}&limit={limit}")
+
     def get_orderbook(self, inst_id: str, sz: int = 20) -> Dict[str, Any]:
         return self._request("GET", f"/api/v5/market/books?instId={inst_id}&sz={sz}")
 

@@ -124,3 +124,50 @@ def reconcile(local: Dict[str, Dict[str, Any]], exch_positions: List[Dict[str, A
         if not has_sl:
             issues.append(f"NO_EXCHANGE_SL:{inst}")
     return {"ok": not issues, "issues": issues, "exchange": exch}
+
+
+def ema(values: List[float], period: int) -> Optional[float]:
+    """EMA med SMA-seed över hela serien. None om för få värden."""
+    if period <= 0 or len(values) < period:
+        return None
+    e = sum(values[:period]) / period
+    k = 2.0 / (period + 1)
+    for v in values[period:]:
+        e = v * k + e * (1 - k)
+    return e
+
+
+def closes_from_candles(resp: Dict[str, Any]) -> List[float]:
+    """OKX candles (nyast först) -> stängningar äldst först, bara stängda staplar (confirm=1)."""
+    if resp.get("code") != "0":
+        return []
+    out = []
+    for c in reversed(resp.get("data") or []):
+        if len(c) >= 9 and str(c[8]) != "1":
+            continue
+        try:
+            out.append(float(c[4]))
+        except (TypeError, ValueError, IndexError):
+            return []
+    return out
+
+
+def trend_allows(side: str, closes: List[float], period: int = 50) -> Tuple[bool, str]:
+    """Long bara över EMA(period), short bara under. Saknad data => nej."""
+    e = ema(closes, period)
+    if e is None:
+        return False, f"TREND_NO_DATA({len(closes)}<{period})"
+    last = closes[-1]
+    if side == "buy" and last <= e:
+        return False, f"TREND_AGAINST_LONG(close={last:.6g}<=ema{period}={e:.6g})"
+    if side == "sell" and last >= e:
+        return False, f"TREND_AGAINST_SHORT(close={last:.6g}>=ema{period}={e:.6g})"
+    return True, "OK"
+
+
+def obi_confirmed(samples: List[float], threshold: float) -> bool:
+    """Alla mätningar över tröskeln och åt samma håll."""
+    if not samples:
+        return False
+    sign = 1 if samples[0] > 0 else -1
+    return all(abs(x) >= threshold and (1 if x > 0 else -1) == sign for x in samples)

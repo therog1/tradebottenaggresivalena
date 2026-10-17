@@ -101,3 +101,21 @@ def test_choose_leverage_min_when_margin_plenty_and_never_above_max():
     assert lev == 10 and sz["margin_limited"]
     # risk-per-trade unchanged regardless of leverage
     assert sz["risk_usd"] <= 50 * 0.01 + 1e-9
+
+
+def test_ema_and_trend_filter():
+    from risk import ema, trend_allows, closes_from_candles, obi_confirmed
+    up = [float(i) for i in range(1, 81)]
+    assert ema(up, 50) < up[-1]
+    assert trend_allows("buy", up, 50)[0] and not trend_allows("sell", up, 50)[0]
+    down = list(reversed(up))
+    assert trend_allows("sell", down, 50)[0] and not trend_allows("buy", down, 50)[0]
+    assert trend_allows("buy", up[:10], 50) == (False, "TREND_NO_DATA(10<50)")
+    resp = {"code": "0", "data": [["3", "0", "0", "0", "3", "0", "0", "0", "0"],  # ostängd, ignoreras
+                                  ["2", "0", "0", "0", "2", "0", "0", "0", "1"],
+                                  ["1", "0", "0", "0", "1", "0", "0", "0", "1"]]}
+    assert closes_from_candles(resp) == [1.0, 2.0]
+    assert closes_from_candles({"code": "50011"}) == []
+    assert obi_confirmed([0.5, 0.6, 0.47], 0.45)
+    assert not obi_confirmed([0.5, 0.3, 0.6], 0.45)
+    assert not obi_confirmed([0.5, -0.6], 0.45)
