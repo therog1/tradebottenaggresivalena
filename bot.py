@@ -12,7 +12,8 @@ from typing import Dict, Any, List, Optional
 from dotenv import load_dotenv
 from okx_client import OKXClient
 from risk import (validate_book, orderbook_imbalance, leverage_for_obi, choose_leverage, sl_tp_prices,
-                  size_contracts, trailing_hit, reconcile)
+                  size_contracts, trailing_hit, reconcile, closes_from_candles, trend_allows, obi_confirmed)
+import crossbot
 
 load_dotenv()
 
@@ -54,6 +55,13 @@ class LenaAggressiveBot:
         self.take_profit_pct = float(os.getenv("TAKE_PROFIT_PERCENT", "0.040"))
         self.trailing_stop_pct = float(os.getenv("TRAILING_STOP_PERCENT", "0.009"))
         self.imbalance_threshold = float(os.getenv("IMBALANCE_THRESHOLD", "0.45"))
+        # Signalkvalitet: OBI måste hålla i flera mätningar, och riktningen måste följa trenden.
+        self.obi_confirm_samples = int(os.getenv("OBI_CONFIRM_SAMPLES", "3"))
+        self.obi_confirm_interval = float(os.getenv("OBI_CONFIRM_INTERVAL_SECONDS", "3"))
+        self.trend_filter = os.getenv("TREND_FILTER_ENABLED", "true").strip().lower() != "false"
+        self.trend_bar = os.getenv("TREND_BAR", "1H")
+        self.trend_ema = int(os.getenv("TREND_EMA_PERIOD", "50"))
+        self.peer_exposure = []
         # Förlustrisk per affär (andel av verifierat saldo) vid SL-träff; 35 % behålls endast som TAK för marginal per affär.
         self.risk_per_trade = float(os.getenv("RISK_PER_TRADE_FRACTION", "0.01"))
         self.max_margin_frac = float(os.getenv("MAX_MARGIN_FRACTION_PER_TRADE", os.getenv("RISK_PER_TRADE_PERCENT", "0.35")))
@@ -201,6 +209,32 @@ class LenaAggressiveBot:
         if abs(obi) < self.imbalance_threshold:
             return
         side = "buy" if obi > 0 else "sell"
+        # 1) Gemensamt exponeringstak med Anna
+        own = [(crossbot.coin_of(inst), p.get("side") == "BUY") for inst, p in self.active_positions.items()]
+        cb_ok, cb_why = crossbot.check(crossbot.coin_of(symbol), side == "buy", own, self.peer_exposure)
+        if not cb_ok:
+            logging.info(f"[{symbol}] Ingen entry: {cb_why}")
+            return
+        # 2) Trendfilter: long bara över EMA, short bara under
+        if self.trend_filter:
+            closes = closes_from_candles(self.client.get_candles(symbol, bar=self.trend_bar, limit=100))
+            t_ok, t_why = trend_allows(side, closes, self.trend_ema)
+            if not t_ok:
+                logging.info(f"[{symbol}] Ingen entry: {t_why}")
+                return
+        # 3) OBI-bekräftelse: obalansen måste hålla i flera mätningar
+        samples = [obi]
+        for _ in range(max(0, self.obi_confirm_samples - 1)):
+            self._sleep(self.obi_confirm_interval)
+            book = self.client.get_orderbook(symbol, sz=15)
+            ok, why, q = validate_book(book, self.max_book_age_s, self.max_spread_pct)
+            if not ok:
+                logging.info(f"[{symbol}] Ingen entry: bekräftelse misslyckades ({why})")
+                return
+            samples.append(orderbook_imbalance(book))
+        if not obi_confirmed(samples, self.imbalance_threshold):
+            logging.info(f"[{symbol}] Ingen entry: OBI höll inte ({', '.join(f'{x:+.2f}' for x in samples)})")
+            return
         ref = q["ask"] if side == "buy" else q["bid"]
         sl_px, tp_px = sl_tp_prices(ref, side, self.stop_loss_pct, self.take_profit_pct)
         spec = CONTRACT_SPECS.get(symbol)
@@ -319,6 +353,8 @@ class LenaAggressiveBot:
         if self.risk_blocked:
             logging.warning(f"Nya affärer blockerade: {self.block_reasons}")
             return
+        peer = crossbot.load_peer("anna")
+        self.peer_exposure = peer
         for symbol in self.symbols:
             try:
                 self.try_entry(symbol, equity)

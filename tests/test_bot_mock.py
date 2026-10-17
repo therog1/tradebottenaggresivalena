@@ -41,6 +41,12 @@ class FakeOKX:
         self.algo_placed.append((a, k)); return {"code": "0" if self.algo_place_ok else "51000"}
     def get_order_history(self, **k):
         return {"code": "0", "data": []}
+    trend_up = True
+    def get_candles(self, inst_id, bar="1H", limit=100):
+        # nyast först; stigande (eller fallande) serie, alla stängda
+        n = 80
+        closes = [0.40 + 0.002 * i for i in range(n)] if self.trend_up else [0.60 - 0.002 * i for i in range(n)]
+        return {"code": "0", "data": [[str(i), "0", "0", "0", f"{c:.4f}", "0", "0", "0", "1"] for i, c in reversed(list(enumerate(closes)))]}
 
 @pytest.fixture
 def mk(tmp_path, monkeypatch):
@@ -145,3 +151,34 @@ def test_open_risk_legacy_record_without_any_sl_is_not_zero(mk):
     b = mk(FakeOKX(), local={SYM: {"entry_price": 1.3686, "num_contracts": 51}})
     assert b._open_risk_usd() == pytest.approx(1.3686 * b.stop_loss_pct * 51)
     assert b._open_risk_usd() > 0
+
+
+# ------------------------------------------------------- signalkvalitet + cross-bot
+def test_trend_filter_blocks_long_in_downtrend(mk):
+    f = FakeOKX(); f.trend_up = False; b = mk(f)
+    assert b.preflight()
+    b.try_entry(SYM, 70.0)
+    assert f.orders == [] and SYM not in b.active_positions
+
+def test_obi_must_persist(mk):
+    f = FakeOKX(); b = mk(f)
+    books = iter([{"code": "0", "data": [{"ts": str(time.time() * 1000), "bids": [["0.5000", "900"]], "asks": [["0.5001", "100"]]}]},
+                  {"code": "0", "data": [{"ts": str(time.time() * 1000), "bids": [["0.5000", "100"]], "asks": [["0.5001", "900"]]}]}])
+    f.get_orderbook = lambda inst_id, sz=15: next(books)
+    assert b.preflight()
+    b.try_entry(SYM, 70.0)
+    assert f.orders == []
+
+def test_peer_same_coin_blocks_entry(mk):
+    f = FakeOKX(); b = mk(f)
+    assert b.preflight()
+    b.peer_exposure = [("XRP", False)]
+    b.try_entry(SYM, 70.0)
+    assert f.orders == []
+
+def test_direction_cap_blocks_entry(mk):
+    f = FakeOKX(); b = mk(f)
+    assert b.preflight()
+    b.peer_exposure = [("BTC", True), ("ETH", True), ("SOL", True), ("SUI", True)]
+    b.try_entry(SYM, 70.0)
+    assert f.orders == []
