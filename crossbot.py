@@ -22,8 +22,8 @@ FEED_URL = os.getenv("CROSS_BOT_FEED_URL", "https://therog1.github.io/tradebotte
 MAX_FEED_AGE_MIN = float(os.getenv("CROSS_BOT_MAX_FEED_AGE_MIN", "75"))
 MAX_SAME_DIRECTION = int(os.getenv("CROSS_BOT_MAX_SAME_DIRECTION", "4"))
 ENABLED = os.getenv("CROSS_BOT_ENABLED", "true").strip().lower() != "false"
-# Om feeden inte går att läsa: blockera nya affärer (true) eller fortsätt med egna gränser (false).
-FAIL_CLOSED = os.getenv("CROSS_BOT_FAIL_CLOSED", "false").strip().lower() == "true"
+# Om feeden inte går att läsa eller är för gammal: blockera nya affärer (standard).
+FAIL_CLOSED = os.getenv("CROSS_BOT_FAIL_CLOSED", "true").strip().lower() == "true"
 
 Exposure = Tuple[str, bool]  # (coin, long)
 
