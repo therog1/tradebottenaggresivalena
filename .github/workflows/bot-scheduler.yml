@@ -1,0 +1,30 @@
+name: Bot scheduler (keepalive)
+
+# GitHub:s cron körs ofta timmar sent. Det här jobbet startar lena_scalp.yml var 15:e minut
+# i en loop (~5,5 h), och startar sedan om sig självt. Cron nedan är reserv om kedjan bryts.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '7 */3 * * *'
+
+permissions:
+  actions: write
+
+concurrency:
+  group: bot-scheduler
+  cancel-in-progress: false
+
+jobs:
+  loop:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          end=$(( $(date +%s) + 330*60 ))
+          while [ $(date +%s) -lt $end ]; do
+            gh workflow run lena_scalp.yml -R "$GITHUB_REPOSITORY" --ref main  || echo "dispatch misslyckades"
+            sleep $(( 15 * 60 ))
+          done
+          gh workflow run bot-scheduler.yml -R "$GITHUB_REPOSITORY" --ref main
