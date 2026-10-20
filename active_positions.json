@@ -1,19 +1,4 @@
 {
-  "BTC-USD_UM_XPERP-310404": {
-    "entry_price": 81588.9,
-    "side": "BUY",
-    "leverage": 6,
-    "num_contracts": 2.0,
-    "sl_price": 80120.2998,
-    "tp_price": 84852.45599999999,
-    "risk_usd": 0.2937200400000002,
-    "high_price": 81986.6,
-    "low_price": 80808.1,
-    "time": 1792221154.1094177,
-    "ord_id": "4017094782563176448",
-    "cl_ord_id": "lena1792221153588",
-    "sl_attached": true
-  },
   "DOGE-USD_UM_XPERP-310404": {
     "entry_price": 0.07926,
     "side": "BUY",
