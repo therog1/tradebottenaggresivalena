@@ -1,17 +1,32 @@
 {
   "SUI-USD_UM_XPERP-310404": {
-    "entry_price": 1.0163,
+    "entry_price": 1.0005,
     "side": "BUY",
     "leverage": 6,
-    "num_contracts": 22.0,
-    "sl_price": 0.9980066,
-    "tp_price": 1.0569520000000001,
-    "risk_usd": 0.40245480000000033,
-    "high_price": 1.0163,
-    "low_price": 1.0163,
-    "time": 1792509438.941389,
-    "ord_id": "4026768015650508801",
-    "cl_ord_id": "lena1792509438354",
+    "num_contracts": 25.0,
+    "sl_price": 0.9826873999999999,
+    "tp_price": 1.0407279999999999,
+    "risk_usd": 0.4453150000000017,
+    "high_price": 1.0005,
+    "low_price": 1.0004,
+    "time": 1792511222.9304094,
+    "ord_id": "4026827878602690560",
+    "cl_ord_id": "lena1792511222445",
+    "sl_attached": true
+  },
+  "ETH-USD_UM_XPERP-310404": {
+    "entry_price": 2429.63,
+    "side": "BUY",
+    "leverage": 6,
+    "num_contracts": 9.0,
+    "sl_price": 2385.36638,
+    "tp_price": 2526.2536000000005,
+    "risk_usd": 0.3983725800000016,
+    "high_price": 2429.63,
+    "low_price": 2429.63,
+    "time": 1792511241.3692956,
+    "ord_id": "4026828496876654592",
+    "cl_ord_id": "lena1792511240836",
     "sl_attached": true
   }
 }
