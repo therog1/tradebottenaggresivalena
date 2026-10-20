@@ -1134,5 +1134,39 @@
     "entry_time": "2026-10-20T15:45:41Z",
     "exit_time": "2026-10-20T15:45:41Z",
     "status": "CLOSED"
+  },
+  {
+    "id": "OKX-4026828496876654592",
+    "bot": "Aggressiva Lena",
+    "symbol": "ETH-USD_UM_XPERP-310404",
+    "side": "BUY",
+    "leverage": 3,
+    "entry_price": 2429.63,
+    "exit_price": 2429.63,
+    "size_units": 9.0,
+    "notional_usd": 21866.67,
+    "realized_pnl": 0.0,
+    "pnl_pct": 0.0,
+    "exit_reason": "EXCHANGE_FILL",
+    "entry_time": "2026-10-20T15:47:21Z",
+    "exit_time": "2026-10-20T15:47:21Z",
+    "status": "CLOSED"
+  },
+  {
+    "id": "OKX-4026827878602690560",
+    "bot": "Aggressiva Lena",
+    "symbol": "SUI-USD_UM_XPERP-310404",
+    "side": "BUY",
+    "leverage": 3,
+    "entry_price": 1.0005,
+    "exit_price": 1.0005,
+    "size_units": 25.0,
+    "notional_usd": 25.01,
+    "realized_pnl": 0.0,
+    "pnl_pct": 0.0,
+    "exit_reason": "EXCHANGE_FILL",
+    "entry_time": "2026-10-20T15:47:02Z",
+    "exit_time": "2026-10-20T15:47:02Z",
+    "status": "CLOSED"
   }
 ]
