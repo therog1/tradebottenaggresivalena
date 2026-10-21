@@ -1,5 +1,33 @@
 [
   {
+    "id": "TRD-LENA-1792609532996",
+    "bot": "Aggressiva Lena",
+    "symbol": "SUI-USD_UM_XPERP-310404",
+    "side": "BUY",
+    "leverage": 6,
+    "entry_price": 1.0393,
+    "exit_price": 1.0384,
+    "size_units": 23.0,
+    "gross_pnl_est_excl_fees_funding": -0.0207,
+    "exit_reason": "TRAILING_STOP",
+    "status": "CLOSED",
+    "exit_time": "2026-10-21T19:05:32Z"
+  },
+  {
+    "id": "TRD-LENA-1792609532249",
+    "bot": "Aggressiva Lena",
+    "symbol": "ETH-USD_UM_XPERP-310404",
+    "side": "BUY",
+    "leverage": 6,
+    "entry_price": 2429.63,
+    "exit_price": 2489.1,
+    "size_units": 9.0,
+    "gross_pnl_est_excl_fees_funding": 0.5352,
+    "exit_reason": "TRAILING_STOP",
+    "status": "CLOSED",
+    "exit_time": "2026-10-21T19:05:32Z"
+  },
+  {
     "id": "TRD-LENA-1792588775814",
     "bot": "Aggressiva Lena",
     "symbol": "SUI-USD_UM_XPERP-310404",
