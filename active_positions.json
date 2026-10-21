@@ -7,7 +7,7 @@
     "sl_price": 2385.36638,
     "tp_price": 2526.2536000000005,
     "risk_usd": 0.3983725800000016,
-    "high_price": 2480.99,
+    "high_price": 2513.79,
     "low_price": 2429.63,
     "time": 1792511241.3692956,
     "ord_id": "4026828496876654592",
@@ -22,11 +22,26 @@
     "sl_price": 1.0206908000000001,
     "tp_price": 1.0809760000000002,
     "risk_usd": 0.4280115999999947,
-    "high_price": 1.0393,
+    "high_price": 1.055,
     "low_price": 1.0393,
     "time": 1792588800.0959668,
     "ord_id": "4029430935773564929",
     "cl_ord_id": "lena1792588799606",
+    "sl_attached": true
+  },
+  "DOGE-USD_UM_XPERP-310404": {
+    "entry_price": 0.08348,
+    "side": "BUY",
+    "leverage": 6,
+    "num_contracts": 24.0,
+    "sl_price": 0.08197736,
+    "tp_price": 0.0868192,
+    "risk_usd": 0.3606335999999999,
+    "high_price": 0.08348,
+    "low_price": 0.08348,
+    "time": 1792607763.2366438,
+    "ord_id": "4030067234104725504",
+    "cl_ord_id": "lena1792607762787",
     "sl_attached": true
   }
 }
