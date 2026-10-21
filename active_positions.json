@@ -1,19 +1,4 @@
 {
-  "DOGE-USD_UM_XPERP-310404": {
-    "entry_price": 0.08348,
-    "side": "BUY",
-    "leverage": 6,
-    "num_contracts": 24.0,
-    "sl_price": 0.08197736,
-    "tp_price": 0.0868192,
-    "risk_usd": 0.3606335999999999,
-    "high_price": 0.08348,
-    "low_price": 0.08272,
-    "time": 1792607763.2366438,
-    "ord_id": "4030067234104725504",
-    "cl_ord_id": "lena1792607762787",
-    "sl_attached": true
-  },
   "SUI-USD_UM_XPERP-310404": {
     "entry_price": 1.0377,
     "side": "BUY",
