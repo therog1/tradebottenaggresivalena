@@ -25,6 +25,7 @@ logging.basicConfig(
 
 POSITIONS_FILE = os.path.join(os.path.dirname(__file__), "active_positions.json")
 HISTORY_FILE = os.path.join(os.path.dirname(__file__), "trades_history.json")
+MAX_LEVERAGE_HARD_CAP = 3  # Roger 2026-10-22: max 3x
 
 # Contract multiplier table for OKX UM X-Perp contracts
 CONTRACT_SPECS = {
@@ -78,7 +79,10 @@ class LenaAggressiveBot:
         self.kill_switch_min_equity = float(os.getenv("KILL_SWITCH_MIN_EQUITY", "25.0"))
         self.max_open_positions = int(os.getenv("MAX_OPEN_POSITIONS", "3"))
         self.min_leverage = int(os.getenv("MIN_LEVERAGE", "3"))
-        self.max_leverage = int(os.getenv("MAX_LEVERAGE", "5"))
+        # Rogers beslut 2026-10-22: max 3x. Hårt tak i koden oavsett env.
+        self.max_leverage = min(int(os.getenv("MAX_LEVERAGE", "3")), MAX_LEVERAGE_HARD_CAP)
+        # Rogers beslut 2026-10-22: bara short-entries. Exits/SL för befintliga longar påverkas inte.
+        self.short_only = os.getenv("SHORT_ONLY", "true").strip().lower() != "false"
         self.default_leverage = int(os.getenv("DEFAULT_LEVERAGE", "3"))
         self.poll_interval = float(os.getenv("POLL_INTERVAL_SECONDS", "3.0"))
 
@@ -209,6 +213,9 @@ class LenaAggressiveBot:
         if abs(obi) < self.imbalance_threshold:
             return
         side = "buy" if obi > 0 else "sell"
+        if side == "buy" and self.short_only:
+            logging.info(f"[{symbol}] Ingen entry: SHORT_ONLY (long-signal ignoreras)")
+            return
         # 1) Gemensamt exponeringstak med Anna
         own = [(crossbot.coin_of(inst), p.get("side") == "BUY") for inst, p in self.active_positions.items()]
         cb_ok, cb_why = crossbot.check(crossbot.coin_of(symbol), side == "buy", own, self.peer_exposure)
@@ -242,11 +249,14 @@ class LenaAggressiveBot:
             logging.warning(f"[{symbol}] Saknar kontraktsspec – hoppar över.")
             return
         lev, sz = choose_leverage(equity, ref, sl_px, spec["ctVal"], spec["minSz"], spec.get("lotSz", spec["minSz"]),
-                                  self.min_leverage, min(self.max_leverage, 10), self.risk_per_trade,
+                                  min(self.min_leverage, MAX_LEVERAGE_HARD_CAP), min(self.max_leverage, MAX_LEVERAGE_HARD_CAP), self.risk_per_trade,
                                   self.max_margin_frac, self._open_risk_usd(), self.max_total_risk)
         if not sz["ok"]:
             logging.info(f"[{symbol}] Ingen entry: {sz['reason']}")
             return
+        if side == "buy" and self.short_only:  # dubbelkoll precis före order
+            return
+        lev = min(int(lev), MAX_LEVERAGE_HARD_CAP)
         lev_res = self.client.set_leverage(lever=str(lev), mgn_mode="cross", inst_id=symbol)
         if lev_res.get("code") != "0":
             logging.error(f"[{symbol}] set_leverage misslyckades ({lev_res.get('msg')}) – ingen order.")

@@ -54,10 +54,11 @@ def mk(tmp_path, monkeypatch):
     monkeypatch.setattr(botmod, "HISTORY_FILE", str(tmp_path / "hist.json"))
     monkeypatch.setenv("SYMBOLS", SYM)
     monkeypatch.setenv("KILL_SWITCH_FILE", str(tmp_path / "KILL"))
-    def make(fake, local=None):
+    def make(fake, local=None, short_only=False):
         if local is not None:
             (tmp_path / "pos.json").write_text(json.dumps(local))
         b = botmod.LenaAggressiveBot()
+        b.short_only = short_only  # äldre tester använder long-flödet; short-only testas separat
         b.client = fake
         b._sleep = lambda s: None
         return b
@@ -182,3 +183,32 @@ def test_direction_cap_blocks_entry(mk):
     b.peer_exposure = [("BTC", True), ("ETH", True), ("SOL", True), ("SUI", True)]
     b.try_entry(SYM, 70.0)
     assert f.orders == []
+
+
+# ------------------------------------------------------- short-only + max 3x (Roger 2026-10-22)
+SELL_BOOK = {"bids": [["0.5000", "100"]], "asks": [["0.5001", "900"]]}
+
+def _sell_book(f):
+    f.get_orderbook = lambda inst_id, sz=15: {"code": "0", "data": [dict(ts=str(time.time() * 1000), **SELL_BOOK)]}
+
+def test_default_is_short_only_and_max_3x(mk, monkeypatch):
+    monkeypatch.delenv("SHORT_ONLY", raising=False)
+    monkeypatch.setenv("MAX_LEVERAGE", "10")
+    b = botmod.LenaAggressiveBot()
+    assert b.short_only is True and b.max_leverage <= 3
+
+def test_short_only_blocks_long_entry(mk):
+    f = FakeOKX(); b = mk(f, short_only=True)   # köpsidig bok => long-signal
+    assert b.preflight()
+    b.scan_and_execute()
+    assert f.orders == [] and f.lev_calls == [] and SYM not in b.active_positions
+
+def test_short_only_allows_short_with_sl_and_max_3x(mk):
+    f = FakeOKX(); f.trend_up = False; _sell_book(f)
+    b = mk(f, short_only=True); b.max_leverage = 10  # även om env är fel
+    assert b.preflight()
+    b.try_entry(SYM, 70.0)
+    assert len(f.orders) == 1 and f.orders[0]["side"] == "sell"
+    assert f.orders[0]["attach_algo_ords"][0]["slTriggerPx"]
+    assert all(int(c["lever"]) <= 3 for c in f.lev_calls)
+    assert b.active_positions[SYM]["leverage"] <= 3
