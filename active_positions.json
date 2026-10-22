@@ -1,19 +1,4 @@
 {
-  "SUI-USD_UM_XPERP-310404": {
-    "entry_price": 1.01,
-    "side": "SELL",
-    "leverage": 6,
-    "num_contracts": 23.0,
-    "sl_price": 1.0285872,
-    "tp_price": 0.969984,
-    "risk_usd": 0.4275056000000006,
-    "high_price": 1.01,
-    "low_price": 1.0044,
-    "time": 1792634808.6498158,
-    "ord_id": "4030974728113016832",
-    "cl_ord_id": "lena1792634808216",
-    "sl_attached": true
-  },
   "ETH-USD_UM_XPERP-310404": {
     "entry_price": 2440.39,
     "side": "SELL",
