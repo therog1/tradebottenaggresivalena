@@ -1,19 +1,4 @@
 {
-  "SUI-USD_UM_XPERP-310404": {
-    "entry_price": 1.0377,
-    "side": "BUY",
-    "leverage": 6,
-    "num_contracts": 23.0,
-    "sl_price": 1.0189232000000001,
-    "tp_price": 1.079104,
-    "risk_usd": 0.4318663999999983,
-    "high_price": 1.0377,
-    "low_price": 1.0326,
-    "time": 1792609562.3645148,
-    "ord_id": "4030127599769407488",
-    "cl_ord_id": "lena1792609561803",
-    "sl_attached": true
-  },
   "SOL-USD_UM_XPERP-310404": {
     "entry_price": 107.08,
     "side": "BUY",
