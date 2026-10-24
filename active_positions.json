@@ -7,7 +7,7 @@
     "sl_price": 2369.5986,
     "tp_price": 2234.5919999999996,
     "risk_usd": 0.20949299999999993,
-    "high_price": 2334.15,
+    "high_price": 2354.81,
     "low_price": 2327.7,
     "time": 1792867018.8882203,
     "ord_id": "4038766408371326976",
@@ -22,11 +22,26 @@
     "sl_price": 102.84854,
     "tp_price": 96.9888,
     "risk_usd": 0.20003939999999987,
-    "high_price": 101.03,
+    "high_price": 102.22,
     "low_price": 101.03,
     "time": 1792868821.2656386,
     "ord_id": "4038826888624394240",
     "cl_ord_id": "lena1792868820752",
+    "sl_attached": true
+  },
+  "SUI-USD_UM_XPERP-310404": {
+    "entry_price": 0.9376,
+    "side": "SELL",
+    "leverage": 3,
+    "num_contracts": 12.0,
+    "sl_price": 0.9544768,
+    "tp_price": 0.900096,
+    "risk_usd": 0.2025216000000003,
+    "high_price": 0.9376,
+    "low_price": 0.9376,
+    "time": 1792885485.538722,
+    "ord_id": "4039386046222356480",
+    "cl_ord_id": "lena1792885485002",
     "sl_attached": true
   }
 }
