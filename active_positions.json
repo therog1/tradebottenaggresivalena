@@ -14,21 +14,6 @@
     "cl_ord_id": "lena1792635746209",
     "sl_attached": true
   },
-  "SOL-USD_UM_XPERP-310404": {
-    "entry_price": 105.3,
-    "side": "SELL",
-    "leverage": 6,
-    "num_contracts": 20.0,
-    "sl_price": 107.18522,
-    "tp_price": 101.0784,
-    "risk_usd": 0.37704400000000077,
-    "high_price": 105.3,
-    "low_price": 104.49,
-    "time": 1792636636.793297,
-    "ord_id": "4031036067292434432",
-    "cl_ord_id": "lena1792636636205",
-    "sl_attached": true
-  },
   "XRP-USD_UM_XPERP-310404": {
     "entry_price": 1.3204,
     "side": "SELL",
