@@ -7,7 +7,7 @@
     "sl_price": 1.2963212000000002,
     "tp_price": 1.222464,
     "risk_usd": 0.22821200000000097,
-    "high_price": 1.2828,
+    "high_price": 1.2843,
     "low_price": 1.2735,
     "time": 1792861633.9234197,
     "ord_id": "4038585717956333568",
@@ -22,11 +22,26 @@
     "sl_price": 2369.5986,
     "tp_price": 2234.5919999999996,
     "risk_usd": 0.20949299999999993,
-    "high_price": 2327.7,
+    "high_price": 2334.15,
     "low_price": 2327.7,
     "time": 1792867018.8882203,
     "ord_id": "4038766408371326976",
     "cl_ord_id": "lena1792867018344",
+    "sl_attached": true
+  },
+  "SOL-USD_UM_XPERP-310404": {
+    "entry_price": 101.03,
+    "side": "SELL",
+    "leverage": 3,
+    "num_contracts": 11.0,
+    "sl_price": 102.84854,
+    "tp_price": 96.9888,
+    "risk_usd": 0.20003939999999987,
+    "high_price": 101.03,
+    "low_price": 101.03,
+    "time": 1792868821.2656386,
+    "ord_id": "4038826888624394240",
+    "cl_ord_id": "lena1792868820752",
     "sl_attached": true
   }
 }
