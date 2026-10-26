@@ -28,20 +28,5 @@
     "ord_id": "4038826888624394240",
     "cl_ord_id": "lena1792868820752",
     "sl_attached": true
-  },
-  "SUI-USD_UM_XPERP-310404": {
-    "entry_price": 0.9376,
-    "side": "SELL",
-    "leverage": 3,
-    "num_contracts": 12.0,
-    "sl_price": 0.9544768,
-    "tp_price": 0.900096,
-    "risk_usd": 0.2025216000000003,
-    "high_price": 0.9376,
-    "low_price": 0.9376,
-    "time": 1792885485.538722,
-    "ord_id": "4039386046222356480",
-    "cl_ord_id": "lena1792885485002",
-    "sl_attached": true
   }
 }
