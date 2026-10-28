@@ -2176,5 +2176,22 @@
     "entry_time": "2026-10-28T14:48:27Z",
     "exit_time": "2026-10-28T14:48:27Z",
     "status": "CLOSED"
+  },
+  {
+    "id": "OKX-4049933632545017856",
+    "bot": "Aggressiva Lena",
+    "symbol": "BTC-USD_UM_XPERP-310404",
+    "side": "SELL",
+    "leverage": 3,
+    "entry_price": 80600.2,
+    "exit_price": 80600.2,
+    "size_units": 1.0,
+    "notional_usd": 80600.2,
+    "realized_pnl": 0.0,
+    "pnl_pct": 0.0,
+    "exit_reason": "EXCHANGE_FILL",
+    "entry_time": "2026-10-28T15:03:47Z",
+    "exit_time": "2026-10-28T15:03:47Z",
+    "status": "CLOSED"
   }
 ]
