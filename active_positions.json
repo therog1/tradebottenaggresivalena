@@ -1,17 +1,1 @@
-{
-  "SOL-USD_UM_XPERP-310404": {
-    "entry_price": 101.03,
-    "side": "SELL",
-    "leverage": 3,
-    "num_contracts": 11.0,
-    "sl_price": 102.84854,
-    "tp_price": 96.9888,
-    "risk_usd": 0.20003939999999987,
-    "high_price": 102.22,
-    "low_price": 100.87,
-    "time": 1792868821.2656386,
-    "ord_id": "4038826888624394240",
-    "cl_ord_id": "lena1792868820752",
-    "sl_attached": true
-  }
-}
+{}

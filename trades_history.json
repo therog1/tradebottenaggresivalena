@@ -1,5 +1,19 @@
 [
   {
+    "id": "TRD-LENA-1793176344648",
+    "bot": "Aggressiva Lena",
+    "symbol": "SOL-USD_UM_XPERP-310404",
+    "side": "SELL",
+    "leverage": 3,
+    "entry_price": 101.03,
+    "exit_price": null,
+    "size_units": 11.0,
+    "gross_pnl_est_excl_fees_funding": null,
+    "exit_reason": "EXCHANGE_SL_TP_OR_EXTERNAL",
+    "status": "CLOSED",
+    "exit_time": "2026-10-28T08:32:24Z"
+  },
+  {
     "id": "TRD-LENA-1793152892227",
     "bot": "Aggressiva Lena",
     "symbol": "SUI-USD_UM_XPERP-310404",
@@ -2110,6 +2124,23 @@
     "exit_reason": "EXCHANGE_FILL",
     "entry_time": "2026-10-28T01:56:15Z",
     "exit_time": "2026-10-28T01:56:15Z",
+    "status": "CLOSED"
+  },
+  {
+    "id": "OKX-4049134795505061888",
+    "bot": "Aggressiva Lena",
+    "symbol": "SOL-USD_UM_XPERP-310404",
+    "side": "BUY",
+    "leverage": 3,
+    "entry_price": 102.85,
+    "exit_price": 102.85,
+    "size_units": 11.0,
+    "notional_usd": 1131.35,
+    "realized_pnl": 0.0,
+    "pnl_pct": 0.0,
+    "exit_reason": "EXCHANGE_FILL",
+    "entry_time": "2026-10-28T08:27:00Z",
+    "exit_time": "2026-10-28T08:27:00Z",
     "status": "CLOSED"
   }
 ]
