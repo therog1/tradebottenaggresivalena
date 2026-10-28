@@ -1,1 +1,17 @@
-{}
+{
+  "NEAR-USD_UM_XPERP-310613": {
+    "entry_price": 4.593,
+    "side": "SELL",
+    "leverage": 3,
+    "num_contracts": 3.0,
+    "sl_price": 4.676692,
+    "tp_price": 4.41024,
+    "risk_usd": 0.2510760000000003,
+    "high_price": 4.593,
+    "low_price": 4.593,
+    "time": 1793196228.0325103,
+    "ord_id": "4049812835046313984",
+    "cl_ord_id": "lena1793196227506",
+    "sl_attached": true
+  }
+}
