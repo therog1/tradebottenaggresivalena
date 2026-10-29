@@ -1,19 +1,4 @@
 {
-  "BTC-USD_UM_XPERP-310404": {
-    "entry_price": 80600.2,
-    "side": "SELL",
-    "leverage": 3,
-    "num_contracts": 1.0,
-    "sl_price": 82062.4052,
-    "tp_price": 77386.94399999999,
-    "risk_usd": 0.1462205199999997,
-    "high_price": 81048.1,
-    "low_price": 80075.1,
-    "time": 1793199828.091034,
-    "ord_id": "4049933632545017856",
-    "cl_ord_id": "lena1793199827524",
-    "sl_attached": true
-  },
   "XRP-USD_UM_XPERP-310404": {
     "entry_price": 1.2908,
     "side": "SELL",
