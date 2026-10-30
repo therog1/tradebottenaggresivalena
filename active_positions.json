@@ -1,17 +1,17 @@
 {
   "XRP-USD_UM_XPERP-310404": {
-    "entry_price": 1.2541,
+    "entry_price": 1.2155,
     "side": "SELL",
     "leverage": 3,
-    "num_contracts": 9.0,
-    "sl_price": 1.276572,
-    "tp_price": 1.20384,
-    "risk_usd": 0.20224800000000043,
-    "high_price": 1.2541,
-    "low_price": 1.2374,
-    "time": 1793308958.831192,
-    "ord_id": "4053595450492637184",
-    "cl_ord_id": "lena1793308958238",
+    "num_contracts": 12.0,
+    "sl_price": 1.237379,
+    "tp_price": 1.16688,
+    "risk_usd": 0.2625479999999998,
+    "high_price": 1.2155,
+    "low_price": 1.2155,
+    "time": 1793320662.0098615,
+    "ord_id": "4053988146466050048",
+    "cl_ord_id": "lena1793320661498",
     "sl_attached": true
   }
 }
