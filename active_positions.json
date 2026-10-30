@@ -7,26 +7,26 @@
     "sl_price": 0.9077506000000001,
     "tp_price": 0.856032,
     "risk_usd": 0.2407590000000004,
-    "high_price": 0.896,
+    "high_price": 0.8963,
     "low_price": 0.8917,
     "time": 1793335998.2096343,
     "ord_id": "4054502742704574464",
     "cl_ord_id": "lena1793335997653",
     "sl_attached": true
   },
-  "LINK-USD_UM_XPERP-310523": {
-    "entry_price": 11.115,
+  "ETH-USD_UM_XPERP-310404": {
+    "entry_price": 2238.7,
     "side": "SELL",
     "leverage": 3,
-    "num_contracts": 1.0,
-    "sl_price": 11.31507,
-    "tp_price": 10.670399999999999,
-    "risk_usd": 0.2000700000000002,
-    "high_price": 11.115,
-    "low_price": 11.115,
-    "time": 1793342320.865476,
-    "ord_id": "4054714895835385856",
-    "cl_ord_id": "lena1793342320314",
+    "num_contracts": 5.0,
+    "sl_price": 2278.9966,
+    "tp_price": 2149.1519999999996,
+    "risk_usd": 0.20148300000000063,
+    "high_price": 2238.7,
+    "low_price": 2238.7,
+    "time": 1793398220.5486321,
+    "ord_id": "4056590577108570112",
+    "cl_ord_id": "lena1793398219946",
     "sl_attached": true
   }
 }
