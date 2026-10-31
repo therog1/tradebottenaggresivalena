@@ -12,6 +12,14 @@ class FakeOKX:
         self.order_state, self.fill_sz = order_state, fill_sz
         self.balance_code, self.attach_ok, self.algo_place_ok, self.order_code = balance_code, attach_ok, algo_place_ok, order_code
         self.orders, self.closed, self.algo_placed, self.lev_calls = [], [], [], []
+        self.cancels, self.open_orders, self.cancel_works = [], [], True
+    def get_open_orders(self, inst_id=None):
+        return {"code": "0", "data": self.open_orders}
+    def cancel_order(self, inst_id, ord_id=None, cl_ord_id=None):
+        self.cancels.append((inst_id, ord_id, cl_ord_id))
+        if self.cancel_works and self.order_state in ("live", "partially_filled"):
+            self.order_state = "canceled"
+        return {"code": "0", "data": [{"sCode": "0"}]}
     def get_balance(self, ccy=None):
         if self.balance_code != "0":
             return {"code": self.balance_code, "data": []}
@@ -36,7 +44,7 @@ class FakeOKX:
         return {"code": "0", "data": [{"ordId": "1", "sCode": "0"}]}
     def get_order(self, inst_id, ord_id=None, cl_ord_id=None):
         sz = self.fill_sz if self.fill_sz is not None else self.orders[-1]["sz"]
-        return {"code": "0", "data": [{"ordId": "1", "state": self.order_state, "accFillSz": sz, "avgPx": "0.5001"}]}
+        return {"code": "0", "data": [{"ordId": "1", "state": self.order_state, "accFillSz": sz, "avgPx": self.orders[-1].get("px") or "0.5001"}]}
     def place_algo_order(self, *a, **k):
         self.algo_placed.append((a, k)); return {"code": "0" if self.algo_place_ok else "51000"}
     def get_order_history(self, **k):
@@ -72,20 +80,24 @@ def test_happy_path_entry_attaches_sl_and_verifies_fill(mk):
     o = f.orders[0]
     assert o["attach_algo_ords"][0]["slTriggerPx"] and o["cl_ord_id"]
     p = b.active_positions[SYM]
-    assert p["sl_attached"] and p["entry_price"] == 0.5001
+    assert p["sl_attached"] and p["entry_price"] == 0.5000
     # SL på pris: 1.8 % under entry-referens
-    assert float(o["attach_algo_ords"][0]["slTriggerPx"]) == pytest.approx(0.5001 * 0.982, rel=1e-6)
+    # post-only entry (köp) ligger på bästa bid 0.5000 -> SL räknas från limitpriset
+    assert o["ord_type"] == "post_only" and o["px"] == "0.5000"
+    assert float(o["attach_algo_ords"][0]["slTriggerPx"]) == pytest.approx(0.5000 * 0.982, rel=1e-6)
     # risk <= 1 % av verifierat saldo (min av availEq/availBal/eq = 50)
     assert p["risk_usd"] <= 0.5 + 1e-6
 
 def test_accepted_but_unfilled_is_not_position(mk):
     f = FakeOKX(order_state="live", fill_sz="0"); b = mk(f)
+    b.entry_ord_type = "market"   # gamla market-flödet: overifierad fyllnad blockerar
     b.preflight(); b.scan_and_execute()
     assert SYM not in b.active_positions
     assert any(r.startswith("FILL_UNVERIFIED") for r in b.block_reasons)
 
 def test_partial_fill_records_filled_qty_and_blocks(mk):
     f = FakeOKX(order_state="partially_filled", fill_sz="3"); b = mk(f)
+    b.entry_ord_type = "market"
     b.preflight(); b.scan_and_execute()
     assert b.active_positions[SYM]["num_contracts"] == 3
     assert any(r.startswith("PARTIAL_FILL") for r in b.block_reasons)
@@ -212,3 +224,69 @@ def test_short_only_allows_short_with_sl_and_max_3x(mk):
     assert f.orders[0]["attach_algo_ords"][0]["slTriggerPx"]
     assert all(int(c["lever"]) <= 3 for c in f.lev_calls)
     assert b.active_positions[SYM]["leverage"] <= 3
+
+
+# ------------------------------------------------------- post-only limit-entry (Roger 2026-10-31)
+def _short(mk, f):
+    f.trend_up = False; _sell_book(f)
+    b = mk(f, short_only=True)
+    assert b.preflight()
+    return b
+
+def test_postonly_short_rests_at_best_ask_with_sl_tp(mk):
+    f = FakeOKX(); b = _short(mk, f)
+    b.try_entry(SYM, 70.0)
+    o = f.orders[0]
+    assert o["ord_type"] == "post_only" and o["side"] == "sell" and o["px"] == "0.5001"
+    a = o["attach_algo_ords"][0]
+    assert float(a["slTriggerPx"]) == pytest.approx(0.5001 * 1.018, rel=1e-6) and a["tpTriggerPx"]
+    assert b.active_positions[SYM]["sl_attached"] and b.active_positions[SYM]["entry_ord_type"] == "post_only"
+
+def test_postonly_unfilled_is_cancelled_no_position_no_block(mk):
+    f = FakeOKX(order_state="live", fill_sz="0"); b = _short(mk, f)
+    b.try_entry(SYM, 70.0)
+    assert f.cancels and f.cancels[0][2] == f.orders[0]["cl_ord_id"]
+    assert SYM not in b.active_positions
+    assert b.block_reasons == []
+
+def test_postonly_cancel_unverified_blocks(mk):
+    f = FakeOKX(order_state="live", fill_sz="0"); f.cancel_works = False; b = _short(mk, f)
+    b.try_entry(SYM, 70.0)
+    assert SYM not in b.active_positions
+    assert any(r.startswith("ENTRY_CANCEL_UNVERIFIED") for r in b.block_reasons)
+
+def test_postonly_partial_cancels_remainder_and_records_filled_with_sl(mk):
+    f = FakeOKX(order_state="partially_filled", fill_sz="3"); b = _short(mk, f)
+    b.try_entry(SYM, 70.0)
+    assert f.cancels
+    p = b.active_positions[SYM]
+    assert p["num_contracts"] == 3 and p["sl_attached"]
+    assert any(r.startswith("PARTIAL_FILL") for r in b.block_reasons)
+
+def test_postonly_filled_but_sl_missing_places_standalone_sl(mk):
+    f = FakeOKX(attach_ok=False); b = _short(mk, f)
+    b.try_entry(SYM, 70.0)
+    assert f.algo_placed and b.active_positions[SYM]["sl_attached"]
+
+def test_postonly_rejected_leaves_nothing(mk):
+    f = FakeOKX(order_code="1"); b = _short(mk, f)
+    b.try_entry(SYM, 70.0)
+    assert SYM not in b.active_positions and b.block_reasons == [] and f.cancels == []
+
+def test_postonly_unknown_state_blocks_and_tries_cancel(mk):
+    f = FakeOKX(order_code="-1"); b = _short(mk, f)
+    b.try_entry(SYM, 70.0)
+    assert any(r.startswith("ORDER_STATE_UNKNOWN") for r in b.block_reasons) and f.cancels
+
+def test_market_rollback_switch(mk):
+    f = FakeOKX(); b = _short(mk, f); b.entry_ord_type = "market"
+    b.try_entry(SYM, 70.0)
+    assert f.orders[0]["ord_type"] == "market" and f.orders[0].get("px") is None
+
+def test_preflight_cancels_stale_postonly_entries_only(mk):
+    f = FakeOKX()
+    f.open_orders = [{"instId": SYM, "ordId": "7", "clOrdId": "lena123", "ordType": "post_only"},
+                     {"instId": SYM, "ordId": "8", "clOrdId": "lenax123", "ordType": "market"},
+                     {"instId": SYM, "ordId": "9", "clOrdId": "other", "ordType": "post_only"}]
+    b = mk(f); b.preflight()
+    assert f.cancels == [(SYM, "7", "lena123")]

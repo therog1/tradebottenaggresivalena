@@ -154,5 +154,10 @@ class OKXClient:
             params["instId"] = inst_id
         return self._request("GET", "/api/v5/trade/fills", params=params)
 
-    def cancel_order(self, inst_id: str, ord_id: str) -> Dict[str, Any]:
-        return self._request("POST", "/api/v5/trade/cancel-order", data={"instId": inst_id, "ordId": ord_id})
+    def cancel_order(self, inst_id: str, ord_id: Optional[str] = None, cl_ord_id: Optional[str] = None) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {"instId": inst_id}
+        if ord_id:
+            payload["ordId"] = ord_id
+        elif cl_ord_id:
+            payload["clOrdId"] = cl_ord_id
+        return self._request("POST", "/api/v5/trade/cancel-order", data=payload)

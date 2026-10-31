@@ -72,6 +72,10 @@ class LenaAggressiveBot:
         self.trailing_activate_pct = float(os.getenv("TRAILING_ACTIVATE_FRACTION", "0.004"))
         self.fill_poll_tries = int(os.getenv("FILL_POLL_TRIES", "5"))
         self.fill_poll_interval = float(os.getenv("FILL_POLL_INTERVAL", "0.5"))
+        # Entry som post-only limit (maker). ENTRY_ORDER_TYPE=market ger gamla beteendet (rollback utan kodändring).
+        self.entry_ord_type = "market" if os.getenv("ENTRY_ORDER_TYPE", "post_only").strip().lower() == "market" else "post_only"
+        self.entry_fill_timeout_s = float(os.getenv("ENTRY_FILL_TIMEOUT_SECONDS", "20"))
+        self.entry_poll_interval = float(os.getenv("ENTRY_POLL_INTERVAL_SECONDS", "1.0"))
         self.kill_switch_file = os.getenv("KILL_SWITCH_FILE", os.path.join(os.path.dirname(os.path.abspath(__file__)), "KILL_SWITCH"))
         self.block_reasons: List[str] = []
         self.exchange_positions: Dict[str, Any] = {}
@@ -149,6 +153,7 @@ class LenaAggressiveBot:
         """Stäm av lokal state mot OKX. Blockerar nya riskökande affärer vid avvikelse eller API-fel.
         Stänger ALDRIG något automatiskt; avvikande positioner rapporteras bara."""
         self.block_reasons = []
+        self._cancel_stale_entries()
         pos = self.client.get_positions(inst_type="FUTURES")
         algo = self.client.get_algo_orders_pending()
         if pos.get("code") != "0" or algo.get("code") != "0":
@@ -173,6 +178,17 @@ class LenaAggressiveBot:
             for i in rec["issues"]:
                 logging.critical(f"RECONCILIATION: {i} – nya affärer blockerade, ingenting stängs automatiskt.")
         return rec["ok"]
+
+    def _cancel_stale_entries(self):
+        """Avbryt kvarglömda post-only entry-ordrar (t.ex. om ett tidigare jobb dog under väntan). Rör aldrig exits."""
+        r = self.client.get_open_orders()
+        if r.get("code") != "0":
+            return
+        for o in r.get("data", []):
+            cl = o.get("clOrdId") or ""
+            if o.get("ordType") == "post_only" and cl.startswith("lena") and not cl.startswith(("lenax", "lenaclose")):
+                logging.warning(f"[{o.get('instId')}] Avbryter kvarliggande entry-order {cl}.")
+                self.client.cancel_order(o["instId"], ord_id=o.get("ordId"), cl_ord_id=cl)
 
     @property
     def risk_blocked(self) -> bool:
@@ -242,7 +258,9 @@ class LenaAggressiveBot:
             if not obi_confirmed(samples, self.imbalance_threshold):
                 logging.info(f"[{symbol}] Ingen entry: OBI höll inte ({', '.join(f'{x:+.2f}' for x in samples)})")
                 return
-        ref = q["ask"] if side == "buy" else q["bid"]
+        # Entry: post-only limit på bästa motsidan i egen sida av boken (sell -> bästa ask, buy -> bästa bid) så den vilar som maker.
+        px_str = str(book["data"][0]["bids"][0][0] if side == "buy" else book["data"][0]["asks"][0][0])
+        ref = float(px_str) if self.entry_ord_type == "post_only" else (q["ask"] if side == "buy" else q["bid"])
         sl_px, tp_px = sl_tp_prices(ref, side, self.stop_loss_pct, self.take_profit_pct)
         spec = CONTRACT_SPECS.get(symbol)
         if not spec:
@@ -266,25 +284,38 @@ class LenaAggressiveBot:
                    "slTriggerPx": f"{sl_px:.10g}", "slOrdPx": "-1", "slTriggerPxType": "last",
                    "tpTriggerPx": f"{tp_px:.10g}", "tpOrdPx": "-1", "tpTriggerPxType": "last"}]
         logging.info(f"[{symbol}] {side.upper()} {sz['contracts']} ct @~{ref} lev={lev}x SL={sl_px:.6g} TP={tp_px:.6g} risk=${sz['risk_usd']:.2f}")
-        res = self.client.place_order(inst_id=symbol, td_mode="cross", side=side, ord_type="market",
-                                      sz=f"{sz['contracts']:g}", pos_side="net", cl_ord_id=cl_id, attach_algo_ords=attach)
-        if res.get("code") != "0":
+        res = self.client.place_order(inst_id=symbol, td_mode="cross", side=side, ord_type=self.entry_ord_type,
+                                      sz=f"{sz['contracts']:g}", pos_side="net", cl_ord_id=cl_id, attach_algo_ords=attach,
+                                      px=px_str if self.entry_ord_type == "post_only" else None)
+        d0 = (res.get("data") or [{}])[0] if isinstance(res.get("data"), list) else {}
+        if res.get("code") != "0" or d0.get("sCode") not in (None, "0"):
+            # Post-only som skulle ta likviditet avvisas av OKX utan att något läggs -> ingen position, ingen blockering.
             logging.error(f"[{symbol}] Order avvisad: {res}")
             if res.get("code") in ("-1", "429"):
                 self.block_reasons.append(f"ORDER_STATE_UNKNOWN:{symbol}:{cl_id}")
+                if self.entry_ord_type == "post_only":  # ordern kan ha nått OKX: försök avbryta så den inte fylls senare
+                    self.client.cancel_order(symbol, cl_ord_id=cl_id)
             return
         self._verify_fill(symbol, side, cl_id, lev, sl_px, tp_px, sz)
 
     def _verify_fill(self, symbol, side, cl_id, lev, sl_px, tp_px, sz):
         """En accepterad order är INTE en position. Kräv filled/partially_filled från OKX."""
         o = None
-        for _ in range(self.fill_poll_tries):
+        limit = self.entry_ord_type == "post_only"
+        tries = max(1, int(self.entry_fill_timeout_s / self.entry_poll_interval)) if limit else self.fill_poll_tries
+        interval = self.entry_poll_interval if limit else self.fill_poll_interval
+        for _ in range(tries):
             r = self.client.get_order(symbol, cl_ord_id=cl_id)
             if r.get("code") == "0" and r.get("data"):
                 o = r["data"][0]
                 if o.get("state") in ("filled", "canceled", "mmp_canceled"):
                     break
-            self._sleep(self.fill_poll_interval)
+                # OKX lägger bifogad SL först när hela ordern fyllts ELLER när rest avbrutits -> avbryt resten direkt vid delfyllnad.
+                if limit and o.get("state") == "partially_filled":
+                    break
+            self._sleep(interval)
+        if limit and (not o or o.get("state") not in ("filled", "canceled", "mmp_canceled")):
+            o = self._cancel_entry(symbol, cl_id, o)
         filled = float(o.get("accFillSz") or 0) if o else 0.0
         if not o or filled <= 0:
             state = o.get("state") if o else "unknown"
@@ -301,9 +332,28 @@ class LenaAggressiveBot:
             "sl_price": sl_px, "tp_price": tp_px, "risk_usd": abs(avg - sl_px) * ct * filled,
             "high_price": avg, "low_price": avg, "time": time.time(), "ord_id": o.get("ordId"),
             "cl_ord_id": cl_id, "sl_attached": False,
+            "entry_ord_type": self.entry_ord_type, "entry_fee": float(o.get("fee") or 0),  # fee negativ = kostnad (OKX)
         }
+        notional = avg * ct * filled
+        logging.info(f"[{symbol}] Entry {self.entry_ord_type} fylld {filled:g} @ {avg} fee={o.get('fee')} {o.get('feeCcy')} "
+                     f"(~{abs(float(o.get('fee') or 0)) / notional if notional else 0:.4%} av notional)")
         self._ensure_exchange_sl(symbol)
         self.save_state()
+
+    def _cancel_entry(self, symbol, cl_id, o):
+        """Avbryt ej (helt) fylld entry och vänta på slutstatus. Returnerar sista orderstatus. Overifierad avbrytning blockerar nya affärer."""
+        c = self.client.cancel_order(symbol, ord_id=(o or {}).get("ordId"), cl_ord_id=cl_id)
+        logging.info(f"[{symbol}] Entry ej fylld inom {self.entry_fill_timeout_s:g}s – avbryter ({c.get('code')}).")
+        last = o
+        for _ in range(self.fill_poll_tries):
+            r = self.client.get_order(symbol, cl_ord_id=cl_id)
+            if r.get("code") == "0" and r.get("data"):
+                last = r["data"][0]
+                if last.get("state") in ("filled", "canceled", "mmp_canceled"):
+                    return last
+            self._sleep(self.fill_poll_interval)
+        self.block_reasons.append(f"ENTRY_CANCEL_UNVERIFIED:{symbol}:{cl_id}")
+        return last
 
     def _ensure_exchange_sl(self, symbol):
         """Verifiera att SL finns hos OKX; annars lägg fristående reduce-only SL/TP. Misslyckas det: blockera + larm."""
