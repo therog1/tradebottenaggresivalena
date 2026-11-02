@@ -7,7 +7,7 @@
     "sl_price": 1.2652721999999998,
     "tp_price": 1.1931839999999998,
     "risk_usd": 0.22372199999999953,
-    "high_price": 1.2429,
+    "high_price": 1.2571,
     "low_price": 1.2429,
     "time": 1793579503.7376165,
     "ord_id": "4062673397019103232",
@@ -15,5 +15,22 @@
     "sl_attached": true,
     "entry_ord_type": "post_only",
     "entry_fee": -0.0024858
+  },
+  "LINK-USD_UM_XPERP-310523": {
+    "entry_price": 11.387,
+    "side": "SELL",
+    "leverage": 3,
+    "num_contracts": 1.0,
+    "sl_price": 11.591966000000001,
+    "tp_price": 10.93152,
+    "risk_usd": 0.20496600000000065,
+    "high_price": 11.387,
+    "low_price": 11.387,
+    "time": 1793593916.8482027,
+    "ord_id": "4063156754349871104",
+    "cl_ord_id": "lena1793593907351",
+    "sl_attached": true,
+    "entry_ord_type": "post_only",
+    "entry_fee": -0.0022774
   }
 }
