@@ -3359,5 +3359,22 @@
     "entry_time": "2026-11-02T03:31:20Z",
     "exit_time": "2026-11-02T03:31:20Z",
     "status": "CLOSED"
+  },
+  {
+    "id": "OKX-4063156754349871104",
+    "bot": "Aggressiva Lena",
+    "symbol": "LINK-USD_UM_XPERP-310523",
+    "side": "SELL",
+    "leverage": 3,
+    "entry_price": 11.387,
+    "exit_price": 11.387,
+    "size_units": 1.0,
+    "notional_usd": 11.39,
+    "realized_pnl": 0.0,
+    "pnl_pct": 0.0,
+    "exit_reason": "EXCHANGE_FILL",
+    "entry_time": "2026-11-02T04:31:47Z",
+    "exit_time": "2026-11-02T04:31:55Z",
+    "status": "CLOSED"
   }
 ]
