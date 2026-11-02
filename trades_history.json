@@ -1,5 +1,19 @@
 [
   {
+    "id": "TRD-LENA-1793590280362",
+    "bot": "Aggressiva Lena",
+    "symbol": "DOGE-USD_UM_XPERP-310404",
+    "side": "SELL",
+    "leverage": 3,
+    "entry_price": 0.07621,
+    "exit_price": 0.076,
+    "size_units": 17.0,
+    "gross_pnl_est_excl_fees_funding": 0.0357,
+    "exit_reason": "TRAILING_STOP",
+    "status": "CLOSED",
+    "exit_time": "2026-11-02T03:31:20Z"
+  },
+  {
     "id": "TRD-LENA-1793577660063",
     "bot": "Aggressiva Lena",
     "symbol": "ETH-USD_UM_XPERP-310404",
