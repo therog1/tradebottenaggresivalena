@@ -1,21 +1,4 @@
 {
-  "XRP-USD_UM_XPERP-310404": {
-    "entry_price": 1.2429,
-    "side": "SELL",
-    "leverage": 3,
-    "num_contracts": 10.0,
-    "sl_price": 1.2652721999999998,
-    "tp_price": 1.1931839999999998,
-    "risk_usd": 0.22372199999999953,
-    "high_price": 1.2571,
-    "low_price": 1.2429,
-    "time": 1793579503.7376165,
-    "ord_id": "4062673397019103232",
-    "cl_ord_id": "lena1793579502174",
-    "sl_attached": true,
-    "entry_ord_type": "post_only",
-    "entry_fee": -0.0024858
-  },
   "ETH-USD_UM_XPERP-310404": {
     "entry_price": 2239.7,
     "side": "SELL",
