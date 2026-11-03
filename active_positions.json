@@ -16,23 +16,6 @@
     "entry_ord_type": "post_only",
     "entry_fee": -0.0024858
   },
-  "LINK-USD_UM_XPERP-310523": {
-    "entry_price": 11.387,
-    "side": "SELL",
-    "leverage": 3,
-    "num_contracts": 1.0,
-    "sl_price": 11.591966000000001,
-    "tp_price": 10.93152,
-    "risk_usd": 0.20496600000000065,
-    "high_price": 11.387,
-    "low_price": 11.023,
-    "time": 1793593916.8482027,
-    "ord_id": "4063156754349871104",
-    "cl_ord_id": "lena1793593907351",
-    "sl_attached": true,
-    "entry_ord_type": "post_only",
-    "entry_fee": -0.0022774
-  },
   "ETH-USD_UM_XPERP-310404": {
     "entry_price": 2239.7,
     "side": "SELL",
@@ -41,7 +24,7 @@
     "sl_price": 2280.0146,
     "tp_price": 2150.1119999999996,
     "risk_usd": 0.20157300000000078,
-    "high_price": 2239.7,
+    "high_price": 2256.28,
     "low_price": 2239.7,
     "time": 1793688716.9341755,
     "ord_id": "4066337697558482944",
@@ -49,5 +32,22 @@
     "sl_attached": true,
     "entry_ord_type": "post_only",
     "entry_fee": -0.0022397
+  },
+  "DOGE-USD_UM_XPERP-310404": {
+    "entry_price": 0.07383,
+    "side": "SELL",
+    "leverage": 3,
+    "num_contracts": 14.0,
+    "sl_price": 0.07515894000000001,
+    "tp_price": 0.0708768,
+    "risk_usd": 0.1860516000000001,
+    "high_price": 0.07383,
+    "low_price": 0.07383,
+    "time": 1793696769.514237,
+    "ord_id": "4066607544414556160",
+    "cl_ord_id": "lena1793696748877",
+    "sl_attached": true,
+    "entry_ord_type": "post_only",
+    "entry_fee": -0.00206724
   }
 }
