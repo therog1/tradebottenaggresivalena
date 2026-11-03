@@ -1,19 +1,36 @@
 {
   "DOGE-USD_UM_XPERP-310404": {
-    "entry_price": 0.07383,
+    "entry_price": 0.07512,
     "side": "SELL",
     "leverage": 3,
-    "num_contracts": 14.0,
-    "sl_price": 0.07515894000000001,
-    "tp_price": 0.0708768,
-    "risk_usd": 0.1860516000000001,
-    "high_price": 0.07383,
-    "low_price": 0.07383,
-    "time": 1793696769.514237,
-    "ord_id": "4066607544414556160",
-    "cl_ord_id": "lena1793696748877",
+    "num_contracts": 19.0,
+    "sl_price": 0.07647216000000001,
+    "tp_price": 0.0721152,
+    "risk_usd": 0.256910400000001,
+    "high_price": 0.07512,
+    "low_price": 0.07512,
+    "time": 1793710279.6931543,
+    "ord_id": "4067061378744111104",
+    "cl_ord_id": "lena1793710274060",
     "sl_attached": true,
     "entry_ord_type": "post_only",
-    "entry_fee": -0.00206724
+    "entry_fee": -0.00285456
+  },
+  "LINK-USD_UM_XPERP-310523": {
+    "entry_price": 11.222,
+    "side": "SELL",
+    "leverage": 3,
+    "num_contracts": 1.0,
+    "sl_price": 11.423995999999999,
+    "tp_price": 10.773119999999999,
+    "risk_usd": 0.2019959999999994,
+    "high_price": 11.222,
+    "low_price": 11.222,
+    "time": 1793710296.327191,
+    "ord_id": "4067061858673152000",
+    "cl_ord_id": "lena1793710288474",
+    "sl_attached": true,
+    "entry_ord_type": "post_only",
+    "entry_fee": -0.0022444
   }
 }
